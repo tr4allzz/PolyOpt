@@ -1,0 +1,73 @@
+{
+  "name": "polyopt",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "import-rewards": "npx tsx scripts/import-from-dune.ts",
+    "import-rewards-csv": "npx tsx scripts/import-transactions-from-csv.ts",
+    "sync-leaderboard": "npx tsx scripts/sync-leaderboard.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tr4allzz/PolyOpt.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tr4allzz/PolyOpt/issues"
+  },
+  "homepage": "https://github.com/tr4allzz/PolyOpt#readme",
+  "dependencies": {
+    "@polymarket/clob-client": "^4.22.8",
+    "@prisma/client": "^6.18.0",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-progress": "^1.1.7",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@tanstack/react-query": "^5.90.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "lucide-react": "^0.552.0",
+    "next": "^14.2.33",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "2.10",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss-animate": "^1.0.7",
+    "viem": "^2.38.6",
+    "wagmi": "^2.19.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.10",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.9.2",
+    "@types/react": "^19.2.2",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "^16.0.1",
+    "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
+    "prisma": "^6.18.0",
+    "tailwindcss": "^3.4.18",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.6"
+  }
+}

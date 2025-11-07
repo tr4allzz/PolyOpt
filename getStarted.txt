@@ -1,0 +1,1797 @@
+PolyOpt - Complete Implementation Documentation
+Version: 1.0
+Date: 2025-01-XX
+For: Claude Code Implementation
+Estimated Timeline: 4-6 weeks
+
+Table of Contents
+
+Project Overview
+Technical Stack
+Project Structure
+Database Schema
+Core Calculation Engine
+API Endpoints
+Frontend Components
+Authentication & Wallet
+Polymarket API Integration
+Background Jobs
+Testing Strategy
+Deployment
+Environment Variables
+Implementation Phases
+
+
+1. Project Overview
+1.1 Purpose
+PolyOpt is a web application that helps Polymarket liquidity providers optimize their rewards by:
+
+Calculating exact Q-scores using Polymarket's public formula
+Tracking competition in real-time
+Optimizing order placement
+Monitoring daily payouts
+
+1.2 Key Features
+
+Q-Score Calculator: Implement Polymarket's reward formula (Equations 1-7)
+Competition Tracker: Analyze all LPs in a market
+Order Optimizer: Calculate optimal order placement
+Payout Tracker: Monitor on-chain reward distributions
+Dashboard: Real-time portfolio view
+
+1.3 Success Criteria
+
+ Accurate Q-score calculations (±1% of actual payouts)
+ Real-time data updates (<60 second latency)
+ Mobile-responsive design
+ Sub-2 second page load times
+ 99.9% uptime
+
+
+2. Technical Stack
+2.1 Framework & Languages
+json{
+  "frontend": "Next.js 14 (App Router)",
+  "language": "TypeScript",
+  "styling": "TailwindCSS",
+  "components": "shadcn/ui",
+  "database": "PostgreSQL",
+  "orm": "Prisma",
+  "authentication": "Wallet-based (wagmi + viem)",
+  "deployment": "Vercel (frontend) + Railway (database)",
+  "monitoring": "Sentry"
+}
+2.2 Key Dependencies
+json{
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "typescript": "^5.3.0",
+    "@prisma/client": "^5.7.0",
+    "wagmi": "^2.0.0",
+    "viem": "^2.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "recharts": "^2.10.0",
+    "zod": "^3.22.0",
+    "date-fns": "^3.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "@testing-library/react": "^14.0.0",
+    "prettier": "^3.0.0",
+    "eslint": "^8.0.0"
+  }
+}
+```
+
+---
+
+## 3. Project Structure
+```
+polyopt/
+├── app/
+│   ├── (auth)/
+│   │   └── connect/
+│   │       └── page.tsx
+│   ├── (dashboard)/
+│   │   ├── layout.tsx
+│   │   ├── page.tsx              # Main dashboard
+│   │   ├── markets/
+│   │   │   ├── page.tsx          # Market list
+│   │   │   └── [id]/
+│   │   │       └── page.tsx      # Market detail
+│   │   ├── portfolio/
+│   │   │   └── page.tsx          # Portfolio view
+│   │   ├── optimize/
+│   │   │   └── page.tsx          # Optimizer tool
+│   │   └── history/
+│   │       └── page.tsx          # Payout history
+│   ├── api/
+│   │   ├── markets/
+│   │   │   ├── route.ts          # GET all markets
+│   │   │   └── [id]/
+│   │   │       └── route.ts      # GET market details
+│   │   ├── calculate/
+│   │   │   └── route.ts          # POST calculate Q-score
+│   │   ├── optimize/
+│   │   │   └── route.ts          # POST optimize placement
+│   │   ├── user/
+│   │   │   ├── positions/
+│   │   │   │   └── route.ts      # GET user positions
+│   │   │   └── payouts/
+│   │   │       └── route.ts      # GET user payouts
+│   │   └── cron/
+│   │       ├── sync-markets/
+│   │       │   └── route.ts      # Sync market data
+│   │       └── track-payouts/
+│   │           └── route.ts      # Track reward payouts
+│   ├── layout.tsx
+│   └── page.tsx                  # Landing page
+├── components/
+│   ├── ui/                       # shadcn/ui components
+│   ├── markets/
+│   │   ├── MarketCard.tsx
+│   │   ├── MarketList.tsx
+│   │   └── CompetitionTable.tsx
+│   ├── calculator/
+│   │   ├── QScoreDisplay.tsx
+│   │   └── OrderInput.tsx
+│   ├── optimizer/
+│   │   ├── OptimizerModal.tsx
+│   │   └── OptimizationResult.tsx
+│   ├── charts/
+│   │   ├── PayoutChart.tsx
+│   │   └── QScoreChart.tsx
+│   └── layout/
+│       ├── Header.tsx
+│       ├── Sidebar.tsx
+│       └── Footer.tsx
+├── lib/
+│   ├── rewards/
+│   │   ├── calculator.ts         # Core Q-score logic
+│   │   ├── calculator.test.ts
+│   │   └── optimizer.ts          # Optimization logic
+│   ├── polymarket/
+│   │   ├── client.ts             # API client
+│   │   ├── types.ts
+│   │   └── utils.ts
+│   ├── blockchain/
+│   │   ├── payouts.ts            # On-chain payout tracking
+│   │   └── utils.ts
+│   ├── prisma.ts                 # Prisma client
+│   ├── utils.ts
+│   └── constants.ts
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+├── public/
+│   ├── logo.svg
+│   └── images/
+├── styles/
+│   └── globals.css
+├── types/
+│   ├── rewards.ts
+│   └── api.ts
+├── .env.local
+├── .env.example
+├── next.config.js
+├── tailwind.config.js
+├── tsconfig.json
+├── package.json
+└── README.md
+
+4. Database Schema
+4.1 Prisma Schema
+prisma// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User (Wallet-based)
+model User {
+  id            String   @id @default(cuid())
+  walletAddress String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Subscription
+  tier          Tier     @default(FREE)
+  stripeId      String?  @unique
+  
+  // Relations
+  positions     Position[]
+  payouts       Payout[]
+  alerts        Alert[]
+  
+  @@index([walletAddress])
+  @@index([tier])
+}
+
+enum Tier {
+  FREE
+  PREMIUM
+  PRO
+}
+
+// Market
+model Market {
+  id            String   @id // Polymarket market ID
+  question      String
+  description   String?
+  
+  // Reward Config
+  maxSpread     Float    // Max spread from midpoint (e.g., 0.03 = 3¢)
+  minSize       Float    // Minimum shares to qualify
+  rewardPool    Float    // Daily USD reward amount
+  
+  // Market State
+  midpoint      Float    // Current market midpoint
+  volume        Float    @default(0)
+  liquidity     Float    @default(0)
+  endDate       DateTime
+  active        Boolean  @default(true)
+  resolved      Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  snapshots     MarketSnapshot[]
+  positions     Position[]
+  orders        Order[]
+  
+  @@index([active, rewardPool])
+  @@index([endDate])
+}
+
+// Market Snapshot (Historical data)
+model MarketSnapshot {
+  id          String   @id @default(cuid())
+  marketId    String
+  market      Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  
+  timestamp   DateTime @default(now())
+  midpoint    Float
+  totalQMin   Float    // Sum of all LPs' Q_min
+  lpCount     Int      // Number of active LPs
+  rewardPool  Float    // Snapshot of reward pool at time
+  
+  @@index([marketId, timestamp])
+  @@index([timestamp])
+}
+
+// User Position (Calculated Q-scores)
+model Position {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketId      String
+  market        Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  
+  // Q-Scores
+  qOne          Float
+  qTwo          Float
+  qMin          Float
+  
+  // Estimates
+  estimatedDaily  Float
+  userShare       Float    // Percentage (0-1)
+  competitionQMin Float    // Total Q_min of other LPs
+  
+  // Metadata
+  capitalDeployed Float
+  orderCount      Int
+  
+  calculatedAt    DateTime @default(now())
+  
+  @@unique([userId, marketId])
+  @@index([userId])
+  @@index([marketId])
+  @@index([calculatedAt])
+}
+
+// Order (User's open orders)
+model Order {
+  id          String   @id @default(cuid())
+  userId      String
+  marketId    String
+  market      Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  
+  // Order Details
+  price       Float    // 0.0 to 1.0
+  size        Float    // Number of shares
+  side        Side     // YES or NO
+  type        OrderType // BID or ASK
+  
+  // Metadata
+  spread      Float    // Distance from midpoint
+  score       Float    // Individual order score
+  
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId, marketId, active])
+  @@index([marketId, active])
+}
+
+enum Side {
+  YES
+  NO
+}
+
+enum OrderType {
+  BID
+  ASK
+}
+
+// Payout (On-chain reward distributions)
+model Payout {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  amount        Float
+  date          DateTime
+  txHash        String   @unique
+  blockNumber   Int
+  
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  
+  @@index([userId, date])
+  @@index([date])
+  @@index([txHash])
+}
+
+// Alert
+model Alert {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        AlertType
+  marketId    String?
+  threshold   Float?
+  active      Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([userId, active])
+}
+
+enum AlertType {
+  COMPETITION      // Competition increased
+  WHALE           // Large LP entered
+  OPPORTUNITY     // New high-reward market
+  PAYOUT          // Daily payout received
+}
+
+// API Cache (Optional - for rate limiting)
+model ApiCache {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  data        Json
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  
+  @@index([key])
+  @@index([expiresAt])
+}
+4.2 Database Migrations
+Initial Migration:
+bashnpx prisma migrate dev --name init
+Seed Data (Optional):
+typescript// prisma/seed.ts
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  // Add sample markets for testing
+  await prisma.market.createMany({
+    data: [
+      {
+        id: 'sample-market-1',
+        question: 'Will Trump win 2024?',
+        maxSpread: 0.03,
+        minSize: 100,
+        rewardPool: 240.50,
+        midpoint: 0.552,
+        volume: 45000000,
+        liquidity: 2000000,
+        endDate: new Date('2024-11-05'),
+        active: true,
+      },
+    ],
+  });
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+5. Core Calculation Engine
+5.1 Types Definition
+typescript// lib/rewards/types.ts
+
+export interface Order {
+  price: number;      // 0.0 to 1.0
+  size: number;       // Number of shares
+  side: 'YES' | 'NO';
+  type: 'BID' | 'ASK';
+}
+
+export interface Market {
+  id: string;
+  question: string;
+  midpoint: number;     // Current market midpoint (0.0 to 1.0)
+  maxSpread: number;    // Max spread from midpoint (e.g., 0.03 = 3¢)
+  minSize: number;      // Minimum shares to qualify
+  rewardPool: number;   // Daily USD reward amount
+}
+
+export interface QScore {
+  qOne: number;   // First side score
+  qTwo: number;   // Second side score
+  qMin: number;   // Final score (min of qOne and qTwo)
+}
+
+export interface RewardEstimate {
+  userShare: number;      // Percentage (0 to 1)
+  dailyReward: number;    // USD amount
+  monthlyReward: number;  // USD amount
+  annualizedAPY?: number; // If capital known
+}
+
+export interface OptimalPlacement {
+  buyOrder: { price: number; size: number };
+  sellOrder: { price: number; size: number };
+  expectedQScore: QScore;
+  expectedDailyReward: number;
+  capitalEfficiency: number; // Reward per $ deployed
+}
+5.2 Calculator Implementation
+typescript// lib/rewards/calculator.ts
+
+import { Order, Market, QScore, RewardEstimate } from './types';
+
+const SCALING_FACTOR = 3.0; // c in formula (from docs)
+
+/**
+ * Equation 1: S(v,s) = ((v-s)/v)^2 * b
+ * Calculate score for a single order
+ * 
+ * @param maxSpread - Maximum qualifying spread (v)
+ * @param orderSpread - Actual spread of this order (s)
+ * @param orderSize - Number of shares
+ * @param boost - Multiplier (b), default 1.0
+ * @returns Order score
+ */
+export function calculateOrderScore(
+  maxSpread: number,
+  orderSpread: number,
+  orderSize: number,
+  boost: number = 1.0
+): number {
+  // Orders outside max spread don't qualify
+  if (orderSpread > maxSpread) {
+    return 0;
+  }
+
+  // S(v,s) = ((v-s)/v)^2 * b
+  const spreadRatio = (maxSpread - orderSpread) / maxSpread;
+  const spreadScore = Math.pow(spreadRatio, 2) * boost;
+  
+  return spreadScore * orderSize;
+}
+
+/**
+ * Calculate spread from midpoint for an order
+ */
+export function calculateSpread(
+  orderPrice: number,
+  midpoint: number
+): number {
+  return Math.abs(orderPrice - midpoint);
+}
+
+/**
+ * Equation 2: Calculate Q_one
+ * Q_one = sum of (YES bids + NO asks)
+ * 
+ * @param orders - All user orders
+ * @param market - Market configuration
+ * @returns Q_one score
+ */
+export function calculateQOne(
+  orders: Order[],
+  market: Market
+): number {
+  let score = 0;
+
+  for (const order of orders) {
+    // Skip orders below minimum size
+    if (order.size < market.minSize) {
+      continue;
+    }
+
+    const spread = calculateSpread(order.price, market.midpoint);
+    
+    // Only count YES bids and NO asks
+    if (
+      (order.side === 'YES' && order.type === 'BID') ||
+      (order.side === 'NO' && order.type === 'ASK')
+    ) {
+      score += calculateOrderScore(
+        market.maxSpread,
+        spread,
+        order.size
+      );
+    }
+  }
+
+  return score;
+}
+
+/**
+ * Equation 3: Calculate Q_two
+ * Q_two = sum of (YES asks + NO bids)
+ * 
+ * @param orders - All user orders
+ * @param market - Market configuration
+ * @returns Q_two score
+ */
+export function calculateQTwo(
+  orders: Order[],
+  market: Market
+): number {
+  let score = 0;
+
+  for (const order of orders) {
+    // Skip orders below minimum size
+    if (order.size < market.minSize) {
+      continue;
+    }
+
+    const spread = calculateSpread(order.price, market.midpoint);
+    
+    // Only count YES asks and NO bids
+    if (
+      (order.side === 'YES' && order.type === 'ASK') ||
+      (order.side === 'NO' && order.type === 'BID')
+    ) {
+      score += calculateOrderScore(
+        market.maxSpread,
+        spread,
+        order.size
+      );
+    }
+  }
+
+  return score;
+}
+
+/**
+ * Equation 4: Calculate Q_min
+ * Handles single-sided vs two-sided liquidity
+ * 
+ * @param qOne - First side score
+ * @param qTwo - Second side score
+ * @param midpoint - Current market midpoint
+ * @param c - Scaling factor (default 3.0 from docs)
+ * @returns Q_min score
+ */
+export function calculateQMin(
+  qOne: number,
+  qTwo: number,
+  midpoint: number,
+  c: number = SCALING_FACTOR
+): number {
+  // Equation 4a: If midpoint in [0.10, 0.90]
+  // Allow single-sided with penalty
+  if (midpoint >= 0.10 && midpoint <= 0.90) {
+    const minScore = Math.min(qOne, qTwo);
+    const maxSingleSided = Math.max(qOne / c, qTwo / c);
+    return Math.max(minScore, maxSingleSided);
+  }
+  
+  // Equation 4b: If midpoint < 0.10 or > 0.90
+  // Require two-sided liquidity
+  return Math.min(qOne, qTwo);
+}
+
+/**
+ * Calculate complete Q-score for a user
+ * 
+ * @param orders - User's orders
+ * @param market - Market configuration
+ * @returns Complete Q-score breakdown
+ */
+export function calculateQScore(
+  orders: Order[],
+  market: Market
+): QScore {
+  const qOne = calculateQOne(orders, market);
+  const qTwo = calculateQTwo(orders, market);
+  const qMin = calculateQMin(qOne, qTwo, market.midpoint);
+
+  return { qOne, qTwo, qMin };
+}
+
+/**
+ * Equations 5-7: Calculate expected daily reward
+ * 
+ * @param userQMin - User's Q_min score
+ * @param totalQMin - Sum of all LPs' Q_min in the market
+ * @param rewardPool - Daily reward pool amount
+ * @param capitalDeployed - Optional: user's capital for APY calculation
+ * @returns Reward estimate
+ */
+export function calculateExpectedReward(
+  userQMin: number,
+  totalQMin: number,
+  rewardPool: number,
+  capitalDeployed?: number
+): RewardEstimate {
+  if (totalQMin === 0 || userQMin === 0) {
+    return {
+      userShare: 0,
+      dailyReward: 0,
+      monthlyReward: 0,
+      annualizedAPY: 0,
+    };
+  }
+
+  // Equation 5: Q_normal = Q_min / sum(Q_min)
+  const userShare = userQMin / totalQMin;
+  
+  // Equation 7: Final reward = share * pool
+  const dailyReward = userShare * rewardPool;
+  const monthlyReward = dailyReward * 30;
+
+  // Calculate APY if capital provided
+  let annualizedAPY: number | undefined;
+  if (capitalDeployed && capitalDeployed > 0) {
+    const yearlyReward = dailyReward * 365;
+    annualizedAPY = yearlyReward / capitalDeployed;
+  }
+
+  return {
+    userShare,
+    dailyReward,
+    monthlyReward,
+    annualizedAPY,
+  };
+}
+
+/**
+ * Calculate total competition Q_min from order book
+ * This analyzes all orders in the market to determine total Q_min
+ * 
+ * @param allOrders - All orders in the market
+ * @param market - Market configuration
+ * @returns Total Q_min of all LPs
+ */
+export function calculateTotalCompetitionQMin(
+  allOrders: Order[],
+  market: Market
+): number {
+  // In real implementation, group orders by LP address
+  // For now, calculate total score
+  const score = calculateQScore(allOrders, market);
+  return score.qMin;
+}
+
+/**
+ * Validate calculation against known payout
+ * Used for testing accuracy
+ */
+export function validateCalculation(
+  calculatedReward: number,
+  actualPayout: number,
+  tolerance: number = 0.01 // 1% tolerance
+): {
+  isValid: boolean;
+  error: number;
+  errorPercent: number;
+} {
+  const error = Math.abs(calculatedReward - actualPayout);
+  const errorPercent = actualPayout > 0 ? error / actualPayout : 0;
+  
+  return {
+    isValid: errorPercent <= tolerance,
+    error,
+    errorPercent,
+  };
+}
+5.3 Optimizer Implementation
+typescript// lib/rewards/optimizer.ts
+
+import { 
+  calculateQScore, 
+  calculateExpectedReward 
+} from './calculator';
+import { Market, Order, OptimalPlacement } from './types';
+
+/**
+ * Calculate optimal order placement to maximize Q_min
+ * 
+ * Strategy:
+ * 1. Q_min = min(Q_one, Q_two), so want balanced sides
+ * 2. Place orders close to midpoint for higher scores
+ * 3. But not TOO close (avoid adverse selection)
+ * 
+ * @param capital - Total capital to deploy
+ * @param market - Market configuration
+ * @param currentCompetitionQMin - Total Q_min of other LPs
+ * @returns Optimal order placement
+ */
+export function optimizeOrderPlacement(
+  capital: number,
+  market: Market,
+  currentCompetitionQMin: number
+): OptimalPlacement {
+  // Optimal spread: 30-40% of max spread
+  // This balances score (closer = better) vs risk (too close = adverse selection)
+  const optimalSpreadRatio = 0.35;
+  const spreadFromMid = market.maxSpread * optimalSpreadRatio;
+  
+  const buyPrice = market.midpoint - spreadFromMid;
+  const sellPrice = market.midpoint + spreadFromMid;
+  
+  // Split capital to balance Q_one ≈ Q_two
+  // Since spread is same on both sides, equal $ gives balanced Q-scores
+  const capitalPerSide = capital / 2;
+  
+  const buySize = capitalPerSide / buyPrice;
+  const sellSize = capitalPerSide / sellPrice;
+  
+  // Calculate expected scores
+  const orders: Order[] = [
+    { price: buyPrice, size: buySize, side: 'YES', type: 'BID' },
+    { price: sellPrice, size: sellSize, side: 'YES', type: 'ASK' },
+  ];
+  
+  const expectedQScore = calculateQScore(orders, market);
+  
+  // Calculate expected reward
+  const totalQMin = currentCompetitionQMin + expectedQScore.qMin;
+  const { dailyReward } = calculateExpectedReward(
+    expectedQScore.qMin,
+    totalQMin,
+    market.rewardPool
+  );
+  
+  return {
+    buyOrder: { price: buyPrice, size: buySize },
+    sellOrder: { price: sellPrice, size: sellSize },
+    expectedQScore,
+    expectedDailyReward: dailyReward,
+    capitalEfficiency: dailyReward / capital,
+  };
+}
+
+/**
+ * Advanced optimizer that tests multiple strategies
+ * and returns the best one
+ */
+export function optimizeAdvanced(
+  capital: number,
+  market: Market,
+  currentCompetitionQMin: number
+): OptimalPlacement {
+  const strategies = [
+    0.25, // Aggressive (closer to midpoint)
+    0.35, // Balanced (recommended)
+    0.50, // Conservative (further from midpoint)
+  ];
+  
+  let bestPlacement: OptimalPlacement | null = null;
+  let bestExpectedReward = 0;
+  
+  for (const spreadRatio of strategies) {
+    const spreadFromMid = market.maxSpread * spreadRatio;
+    const buyPrice = market.midpoint - spreadFromMid;
+    const sellPrice = market.midpoint + spreadFromMid;
+    
+    const capitalPerSide = capital / 2;
+    const buySize = capitalPerSide / buyPrice;
+    const sellSize = capitalPerSide / sellPrice;
+    
+    const orders: Order[] = [
+      { price: buyPrice, size: buySize, side: 'YES', type: 'BID' },
+      { price: sellPrice, size: sellSize, side: 'YES', type: 'ASK' },
+    ];
+    
+    const expectedQScore = calculateQScore(orders, market);
+    const totalQMin = currentCompetitionQMin + expectedQScore.qMin;
+    const { dailyReward } = calculateExpectedReward(
+      expectedQScore.qMin,
+      totalQMin,
+      market.rewardPool
+    );
+    
+    if (dailyReward > bestExpectedReward) {
+      bestExpectedReward = dailyReward;
+      bestPlacement = {
+        buyOrder: { price: buyPrice, size: buySize },
+        sellOrder: { price: sellPrice, size: sellSize },
+        expectedQScore,
+        expectedDailyReward: dailyReward,
+        capitalEfficiency: dailyReward / capital,
+      };
+    }
+  }
+  
+  return bestPlacement!;
+}
+5.4 Unit Tests
+typescript// lib/rewards/calculator.test.ts
+
+import { describe, it, expect } from 'vitest';
+import {
+  calculateOrderScore,
+  calculateQOne,
+  calculateQTwo,
+  calculateQMin,
+  calculateQScore,
+  calculateExpectedReward,
+} from './calculator';
+import { Market, Order } from './types';
+
+describe('Reward Calculator', () => {
+  const mockMarket: Market = {
+    id: 'test-market',
+    question: 'Test question?',
+    midpoint: 0.50,
+    maxSpread: 0.03, // 3¢
+    minSize: 10,
+    rewardPool: 100,
+  };
+
+  describe('calculateOrderScore', () => {
+    it('should return 0 for orders outside max spread', () => {
+      const score = calculateOrderScore(0.03, 0.04, 100);
+      expect(score).toBe(0);
+    });
+
+    it('should return maximum score for orders at midpoint', () => {
+      const score = calculateOrderScore(0.03, 0.00, 100);
+      expect(score).toBe(100);
+    });
+
+    it('should calculate correct score at 1¢ spread', () => {
+      const score = calculateOrderScore(0.03, 0.01, 100);
+      // ((3-1)/3)^2 * 100 = (2/3)^2 * 100 = 44.44...
+      expect(score).toBeCloseTo(44.44, 2);
+    });
+
+    it('should calculate correct score at 2¢ spread', () => {
+      const score = calculateOrderScore(0.03, 0.02, 100);
+      // ((3-2)/3)^2 * 100 = (1/3)^2 * 100 = 11.11...
+      expect(score).toBeCloseTo(11.11, 2);
+    });
+  });
+
+  describe('calculateQScore', () => {
+    it('should calculate balanced two-sided score', () => {
+      const orders: Order[] = [
+        { price: 0.49, size: 100, side: 'YES', type: 'BID' },
+        { price: 0.51, size: 100, side: 'YES', type: 'ASK' },
+      ];
+
+      const score = calculateQScore(orders, mockMarket);
+      
+      expect(score.qOne).toBeGreaterThan(0);
+      expect(score.qTwo).toBeGreaterThan(0);
+      expect(score.qMin).toBe(Math.min(score.qOne, score.qTwo));
+    });
+
+    it('should ignore orders below min size', () => {
+      const orders: Order[] = [
+        { price: 0.49, size: 5, side: 'YES', type: 'BID' }, // Below min
+        { price: 0.51, size: 100, side: 'YES', type: 'ASK' },
+      ];
+
+      const score = calculateQScore(orders, mockMarket);
+      expect(score.qOne).toBe(0); // No qualifying bids
+    });
+
+    it('should penalize single-sided liquidity', () => {
+      const singleSided: Order[] = [
+        { price: 0.49, size: 100, side: 'YES', type: 'BID' },
+      ];
+
+      const twoSided: Order[] = [
+        { price: 0.49, size: 100, side: 'YES', type: 'BID' },
+        { price: 0.51, size: 100, side: 'YES', type: 'ASK' },
+      ];
+
+      const singleScore = calculateQScore(singleSided, mockMarket);
+      const doubleScore = calculateQScore(twoSided, mockMarket);
+
+      expect(doubleScore.qMin).toBeGreaterThan(singleScore.qMin);
+    });
+  });
+
+  describe('calculateExpectedReward', () => {
+    it('should calculate correct reward share', () => {
+      const result = calculateExpectedReward(100, 1000, 240);
+
+      expect(result.userShare).toBe(0.1); // 10%
+      expect(result.dailyReward).toBe(24); // 10% of $240
+      expect(result.monthlyReward).toBe(720); // $24 * 30
+    });
+
+    it('should handle zero competition', () => {
+      const result = calculateExpectedReward(100, 100, 240);
+
+      expect(result.userShare).toBe(1.0); // 100%
+      expect(result.dailyReward).toBe(240); // All of it
+    });
+
+    it('should calculate APY when capital provided', () => {
+      const result = calculateExpectedReward(100, 1000, 240, 1000);
+
+      expect(result.annualizedAPY).toBeDefined();
+      // $24/day * 365 / $1000 = 8.76 = 876% APY
+      expect(result.annualizedAPY).toBeCloseTo(8.76, 2);
+    });
+  });
+});
+
+6. API Endpoints
+6.1 Markets API
+typescript// app/api/markets/route.ts
+
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { fetchRewardMarkets, fetchMarketDetails } from '@/lib/polymarket/client';
+
+/**
+ * GET /api/markets
+ * Get all active markets with rewards
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = parseInt(searchParams.get('offset') || '0');
+    const activeOnly = searchParams.get('active') !== 'false';
+
+    // Fetch from database
+    const markets = await prisma.market.findMany({
+      where: activeOnly ? { active: true } : undefined,
+      orderBy: { rewardPool: 'desc' },
+      take: limit,
+      skip: offset,
+      select: {
+        id: true,
+        question: true,
+        maxSpread: true,
+        minSize: true,
+        rewardPool: true,
+        midpoint: true,
+        volume: true,
+        liquidity: true,
+        endDate: true,
+        active: true,
+        updatedAt: true,
+      },
+    });
+
+    return NextResponse.json({
+      markets,
+      total: await prisma.market.count({ 
+        where: activeOnly ? { active: true } : undefined 
+      }),
+    });
+  } catch (error) {
+    console.error('Error fetching markets:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch markets' },
+      { status: 500 }
+    );
+  }
+}
+typescript// app/api/markets/[id]/route.ts
+
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { fetchMarketDetails, fetchOrderBook } from '@/lib/polymarket/client';
+
+/**
+ * GET /api/markets/[id]
+ * Get detailed market information
+ */
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+
+    // Get from database
+    const market = await prisma.market.findUnique({
+      where: { id },
+      include: {
+        snapshots: {
+          orderBy: { timestamp: 'desc' },
+          take: 30, // Last 30 snapshots
+        },
+      },
+    });
+
+    if (!market) {
+      return NextResponse.json(
+        { error: 'Market not found' },
+        { status: 404 }
+      );
+    }
+
+    // Optionally fetch fresh data from Polymarket
+    const fresh = request.url.includes('fresh=true');
+    if (fresh) {
+      const freshData = await fetchMarketDetails(id);
+      // Update database with fresh data
+      await prisma.market.update({
+        where: { id },
+        data: {
+          midpoint: freshData.midpoint,
+          volume: freshData.volume,
+          liquidity: freshData.liquidity,
+        },
+      });
+    }
+
+    return NextResponse.json({ market });
+  } catch (error) {
+    console.error('Error fetching market:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch market' },
+      { status: 500 }
+    );
+  }
+}
+6.2 Calculate API
+typescript// app/api/calculate/route.ts
+
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { calculateQScore, calculateExpectedReward } from '@/lib/rewards/calculator';
+import { fetchUserOrders, fetchAllMarketOrders } from '@/lib/polymarket/client';
+
+const CalculateSchema = z.object({
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  marketId: z.string(),
+  capital: z.number().positive().optional(),
+});
+
+/**
+ * POST /api/calculate
+ * Calculate Q-score and expected rewards for a user
+ */
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { walletAddress, marketId, capital } = CalculateSchema.parse(body);
+
+    // Fetch market
+    const market = await prisma.market.findUnique({
+      where: { id: marketId },
+    });
+
+    if (!market) {
+      return NextResponse.json(
+        { error: 'Market not found' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch user's orders from Polymarket
+    const userOrders = await fetchUserOrders(walletAddress, marketId);
+
+    // Calculate user's Q-score
+    const userQScore = calculateQScore(userOrders, {
+      id: market.id,
+      question: market.question,
+      midpoint: market.midpoint,
+      maxSpread: market.maxSpread,
+      minSize: market.minSize,
+      rewardPool: market.rewardPool,
+    });
+
+    // Fetch all orders in market to calculate competition
+    const allOrders = await fetchAllMarketOrders(marketId);
+    
+    // Calculate total Q_min (this is simplified; in production, group by LP address)
+    let totalQMin = userQScore.qMin;
+    // TODO: Properly calculate competition by grouping orders by LP address
+
+    // Calculate expected reward
+    const rewardEstimate = calculateExpectedReward(
+      userQScore.qMin,
+      totalQMin,
+      market.rewardPool,
+      capital
+    );
+
+    // Save position to database
+    await prisma.position.upsert({
+      where: {
+        userId_marketId: {
+          userId: walletAddress,
+          marketId: market.id,
+        },
+      },
+      create: {
+        userId: walletAddress,
+        marketId: market.id,
+        qOne: userQScore.qOne,
+        qTwo: userQScore.qTwo,
+        qMin: userQScore.qMin,
+        estimatedDaily: rewardEstimate.dailyReward,
+        userShare: rewardEstimate.userShare,
+        competitionQMin: totalQMin - userQScore.qMin,
+        capitalDeployed: capital || 0,
+        orderCount: userOrders.length,
+      },
+      update: {
+        qOne: userQScore.qOne,
+        qTwo: userQScore.qTwo,
+        qMin: userQScore.qMin,
+        estimatedDaily: rewardEstimate.dailyReward,
+        userShare: rewardEstimate.userShare,
+        competitionQMin: totalQMin - userQScore.qMin,
+        capitalDeployed: capital || 0,
+        orderCount: userOrders.length,
+        calculatedAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({
+      qScore: userQScore,
+      reward: rewardEstimate,
+      competition: {
+        totalQMin,
+        lpCount: Math.floor(totalQMin / 500), // Rough estimate
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: error.errors },
+        { status: 400 }
+      );
+    }
+    
+    console.error('Error calculating:', error);
+    return NextResponse.json(
+      { error: 'Calculation failed' },
+      { status: 500 }
+    );
+  }
+}
+6.3 Optimize API
+typescript// app/api/optimize/route.ts
+
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { optimizeOrderPlacement } from '@/lib/rewards/optimizer';
+import { fetchAllMarketOrders } from '@/lib/polymarket/client';
+
+const OptimizeSchema = z.object({
+  marketId: z.string(),
+  capital: z.number().positive(),
+});
+
+/**
+ * POST /api/optimize
+ * Calculate optimal order placement
+ */
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { marketId, capital } = OptimizeSchema.parse(body);
+
+    // Fetch market
+    const market = await prisma.market.findUnique({
+      where: { id: marketId },
+    });
+
+    if (!market) {
+      return NextResponse.json(
+        { error: 'Market not found' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch current competition
+    const allOrders = await fetchAllMarketOrders(marketId);
+    // Calculate competition Q_min (simplified)
+    const competitionQMin = 5000; // TODO: Calculate properly
+
+    // Optimize
+    const optimal = optimizeOrderPlacement(
+      capital,
+      {
+        id: market.id,
+        question: market.question,
+        midpoint: market.midpoint,
+        maxSpread: market.maxSpread,
+        minSize: market.minSize,
+        rewardPool: market.rewardPool,
+      },
+      competitionQMin
+    );
+
+    return NextResponse.json({ optimal });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: error.errors },
+        { status: 400 }
+      );
+    }
+    
+    console.error('Error optimizing:', error);
+    return NextResponse.json(
+      { error: 'Optimization failed' },
+      { status: 500 }
+    );
+  }
+}
+
+7. Frontend Components
+7.1 Market Card Component
+typescript// components/markets/MarketCard.tsx
+
+'use client';
+
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
+
+interface MarketCardProps {
+  market: {
+    id: string;
+    question: string;
+    rewardPool: number;
+    maxSpread: number;
+    midpoint: number;
+    volume: number;
+  };
+}
+
+export function MarketCard({ market }: MarketCardProps) {
+  const [loading, setLoading] = useState(false);
+
+  const spreadPercent = (market.maxSpread * 100).toFixed(1);
+  const volumeFormatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(market.volume);
+
+  return (
+    <Card className="group hover:shadow-lg transition-all hover:-translate-y-1">
+      <CardHeader>
+        <CardTitle className="text-lg line-clamp-2">
+          {market.question}
+        </CardTitle>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Daily Rewards</p>
+            <p className="text-2xl font-bold text-green-500">
+              ${market.rewardPool.toFixed(2)}
+            </p>
+          </div>
+          
+          <div>
+            <p className="text-sm text-muted-foreground">Max Spread</p>
+            <p className="text-2xl font-bold">
+              {spreadPercent}¢
+            </p>
+          </div>
+        </div>
+
+        {/* Secondary Metrics */}
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>Volume: {volumeFormatted}</span>
+          <span className="flex items-center gap-1">
+            <TrendingUp className="h-4 w-4" />
+            Mid: {(market.midpoint * 100).toFixed(1)}%
+          </span>
+        </div>
+
+        {/* CTA */}
+        <Link href={`/markets/${market.id}`}>
+          <Button 
+            className="w-full group-hover:bg-primary/90"
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : 'View Details'}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
+7.2 Q-Score Display Component
+typescript// components/calculator/QScoreDisplay.tsx
+
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+
+interface QScoreDisplayProps {
+  qScore: {
+    qOne: number;
+    qTwo: number;
+    qMin: number;
+  };
+  reward: {
+    userShare: number;
+    dailyReward: number;
+    monthlyReward: number;
+  };
+  totalQMin: number;
+}
+
+export function QScoreDisplay({ qScore, reward, totalQMin }: QScoreDisplayProps) {
+  const sharePercent = (reward.userShare * 100).toFixed(2);
+  const scorePercent = (qScore.qMin / totalQMin) * 100;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your Q-Score</CardTitle>
+      </CardHeader>
+      
+      <CardContent className="space-y-6">
+        {/* Main Score */}
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground mb-2">Q_min</p>
+          <p className="text-4xl font-bold tabular-nums">
+            {qScore.qMin.toFixed(0)}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            of {totalQMin.toFixed(0)} total
+          </p>
+        </div>
+
+        {/* Progress Bar */}
+        <div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-muted-foreground">Your Share</span>
+            <span className="font-semibold">{sharePercent}%</span>
+          </div>
+          <Progress value={scorePercent} className="h-2" />
+        </div>
+
+        {/* Score Breakdown */}
+        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+          <div>
+            <p className="text-sm text-muted-foreground">Q_one</p>
+            <p className="text-xl font-bold tabular-nums">
+              {qScore.qOne.toFixed(0)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Q_two</p>
+            <p className="text-xl font-bold tabular-nums">
+              {qScore.qTwo.toFixed(0)}
+            </p>
+          </div>
+        </div>
+
+        {/* Rewards */}
+        <div className="space-y-3 pt-4 border-t">
+          <div className="flex justify-between">
+            <span className="text-sm text-muted-foreground">Daily</span>
+            <span className="font-semibold text-green-500">
+              ${reward.dailyReward.toFixed(2)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-muted-foreground">Monthly</span>
+            <span className="font-semibold text-green-500">
+              ${reward.monthlyReward.toFixed(2)}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+8. Authentication & Wallet
+8.1 Wagmi Configuration
+typescript// lib/wagmi.ts
+
+import { createConfig, http } from 'wagmi';
+import { polygon } from 'wagmi/chains';
+import { injected, walletConnect } from 'wagmi/connectors';
+
+export const config = createConfig({
+  chains: [polygon],
+  connectors: [
+    injected(),
+    walletConnect({
+      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
+    }),
+  ],
+  transports: {
+    [polygon.id]: http(),
+  },
+});
+8.2 Connect Wallet Component
+typescript// components/ConnectWallet.tsx
+
+'use client';
+
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { Button } from '@/components/ui/button';
+import { Wallet } from 'lucide-react';
+
+export function ConnectWallet() {
+  const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
+
+  if (isConnected && address) {
+    return (
+      <Button 
+        variant="outline" 
+        onClick={() => disconnect()}
+      >
+        {address.slice(0, 6)}...{address.slice(-4)}
+      </Button>
+    );
+  }
+
+  return (
+    <Button onClick={() => connect({ connector: connectors[0] })}>
+      <Wallet className="mr-2 h-4 w-4" />
+      Connect Wallet
+    </Button>
+  );
+}
+
+9. Polymarket API Integration
+9.1 API Client
+typescript// lib/polymarket/client.ts
+
+const POLYMARKET_API = 'https://gamma-api.polymarket.com';
+const CLOB_API = 'https://clob.polymarket.com';
+
+interface PolymarketMarket {
+  id: string;
+  question: string;
+  // Add more fields as discovered from actual API
+}
+
+/**
+ * Fetch all markets with active rewards
+ */
+export async function fetchRewardMarkets(): Promise<PolymarketMarket[]> {
+  const response = await fetch(`${POLYMARKET_API}/markets?active=true&limit=100`);
+  
+  if (!response.ok) {
+    throw new Error(`Polymarket API error: ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  
+  // Filter for markets with rewards
+  return data.filter((m: any) => m.rewards?.daily_rewards > 0);
+}
+
+/**
+ * Fetch market details including reward configuration
+ */
+export async function fetchMarketDetails(marketId: string) {
+  const response = await fetch(`${POLYMARKET_API}/markets/${marketId}`);
+  
+  if (!response.ok) {
+    throw new Error(`Market not found: ${marketId}`);
+  }
+  
+  const market = await response.json();
+  
+  return {
+    id: market.id,
+    question: market.question,
+    midpoint: calculateMidpoint(market),
+    maxSpread: market.rewards?.max_spread || 0,
+    minSize: market.rewards?.min_size || 0,
+    rewardPool: market.rewards?.daily_rewards || 0,
+    volume: market.volume || 0,
+    liquidity: market.liquidity || 0,
+    endDate: new Date(market.end_date),
+  };
+}
+
+/**
+ * Fetch user's orders
+ * TODO: Implement based on actual API structure
+ */
+export async function fetchUserOrders(
+  walletAddress: string,
+  marketId?: string
+): Promise<Order[]> {
+  // Implementation depends on actual API
+  throw new Error('Not implemented - need actual API structure');
+}
+
+/**
+ * Fetch all orders in a market
+ * TODO: Implement based on actual API structure
+ */
+export async function fetchAllMarketOrders(
+  marketId: string
+): Promise<Order[]> {
+  // Implementation depends on actual API
+  throw new Error('Not implemented - need actual API structure');
+}
+
+function calculateMidpoint(market: any): number {
+  // Calculate from best bid/ask
+  const bestBid = parseFloat(market.best_bid || '0');
+  const bestAsk = parseFloat(market.best_ask || '1');
+  return (bestBid + bestAsk) / 2;
+}
+
+10. Background Jobs
+10.1 Sync Markets Cron
+typescript// app/api/cron/sync-markets/route.ts
+
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { fetchRewardMarkets } from '@/lib/polymarket/client';
+
+/**
+ * GET /api/cron/sync-markets
+ * Syncs market data from Polymarket
+ * Run every 5 minutes via Vercel Cron or similar
+ */
+export async function GET(request: Request) {
+  // Verify cron secret
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    console.log('Starting market sync...');
+    
+    const markets = await fetchRewardMarkets();
+    
+    let updated = 0;
+    let created = 0;
+    
+    for (const market of markets) {
+      const existing = await prisma.market.findUnique({
+        where: { id: market.id },
+      });
+      
+      if (existing) {
+        await prisma.market.update({
+          where: { id: market.id },
+          data: {
+            rewardPool: market.rewards?.daily_rewards || 0,
+            maxSpread: market.rewards?.max_spread || 0,
+            midpoint: market.midpoint,
+            volume: market.volume,
+            liquidity: market.liquidity,
+            updatedAt: new Date(),
+          },
+        });
+        updated++;
+      } else {
+        await prisma.market.create({
+          data: {
+            id: market.id,
+            question: market.question,
+            description: market.description,
+            maxSpread: market.rewards?.max_spread || 0,
+            minSize: market.rewards?.min_size || 0,
+            rewardPool: market.rewards?.daily_rewards || 0,
+            midpoint: market.midpoint,
+            volume: market.volume || 0,
+            liquidity: market.liquidity || 0,
+            endDate: new Date(market.end_date),
+            active: true,
+          },
+        });
+        created++;
+      }
+    }
+    
+    console.log(`Sync complete: ${created} created, ${updated} updated`);
+    
+    return NextResponse.json({
+      success: true,
+      created,
+      updated,
+    });
+  } catch (error) {
+    console.error('Market sync failed:', error);
+    return NextResponse.json(
+      { error: 'Sync failed' },
+      { status: 500 }
+    );
+  }
+}
+
+11. Testing Strategy
+11.1 Test Structure
+bash# Run all tests
+npm run test
+
+# Run with coverage
+npm run test:coverage
+
+# Run specific test file
+npm run test calculator.test.ts
+11.2 Test Coverage Goals
+
+Calculator functions: 100% coverage
+API endpoints: 80% coverage
+Components: 70% coverage
+
+
+12. Deployment
+12.1 Vercel Configuration
+json// vercel.json
+{
+  "buildCommand": "prisma generate && next build",
+  "env": {
+    "DATABASE_URL": "@database-url",
+    "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID": "@walletconnect-project-id"
+  },
+  "crons": [
+    {
+      "path": "/api/cron/sync-markets",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
+12.2 Railway Database Setup
+bash# Install Railway CLI
+npm install -g @railway/cli
+
+# Login
+railway login
+
+# Create new project
+railway init
+
+# Add PostgreSQL
+railway add postgresql
+
+# Deploy
+railway up
+
+13. Environment Variables
+bash# .env.example
+
+# Database
+DATABASE_URL="postgresql://..."
+
+# Polymarket
+POLYMARKET_API_URL="https://gamma-api.polymarket.com"
+CLOB_API_URL="https://clob.polymarket.com"
+
+# Wallet
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID="..."
+
+# Cron
+CRON_SECRET="..."
+
+# Stripe (optional)
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+
+# Sentry (optional)
+SENTRY_DSN="..."
+
+14. Implementation Phases
+Phase 1: Foundation (Week 1)
+
+ Setup Next.js project
+ Configure database + Prisma
+ Implement core calculation engine
+ Write unit tests for calculator
+ Setup basic UI components
+
+Phase 2: API Integration (Week 2)
+
+ Discover Polymarket API structure
+ Implement API client
+ Create API endpoints
+ Test with real data
+ Handle edge cases
+
+Phase 3: Frontend (Week 3)
+
+ Build dashboard pages
+ Market list and detail views
+ Q-score calculator interface
+ Optimizer modal
+ Wallet integration
+
+Phase 4: Launch (Week 4)
+
+ Deploy to Vercel
+ Setup database on Railway
+ Configure cron jobs
+ Test end-to-end
+ Launch to beta users
+
+
+15. Next Steps for Claude Code
+Start with Phase 1:
+
+Initialize project:
+
+bashnpx create-next-app@latest polyopt --typescript --tailwind --app
+cd polyopt
+npm install @prisma/client wagmi viem @tanstack/react-query
+npm install -D prisma vitest
+
+Setup database:
+
+bashnpx prisma init
+# Copy schema from section 4.1
+npx prisma migrate dev --name init
+
+Implement calculator:
+
+
+Copy code from section 5.2
+Copy tests from section 5.4
+Run tests: npm run test
+
+
+Create API routes:
+
+
+Follow structure in section 6
+Test with curl/Postman
+
+
+Build components:
+
+
+Implement from section 7
+Use shadcn/ui for base components
+
+Questions to resolve before full implementation:
+
+Get actual Polymarket API response examples
+Verify reward formula matches documentation
+Test calculation accuracy against real payouts

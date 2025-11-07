@@ -1,0 +1,211 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User (Wallet-based)
+model User {
+  id            String   @id @default(cuid())
+  walletAddress String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Subscription
+  tier          Tier     @default(FREE)
+  stripeId      String?  @unique
+
+  // Polymarket API Credentials (L2 Authentication)
+  // TODO: Encrypt these in production
+  apiKey        String?
+  apiSecret     String?
+  apiPassphrase String?
+  apiCreatedAt  DateTime?
+
+  // Relations
+  positions     Position[]
+  payouts       Payout[]
+  alerts        Alert[]
+
+  @@index([walletAddress])
+  @@index([tier])
+}
+
+enum Tier {
+  FREE
+  PREMIUM
+  PRO
+}
+
+// Market
+model Market {
+  id            String   @id // Polymarket Gamma API ID (numeric)
+  conditionId   String?  @unique // Polymarket condition ID (hex) - for Data API
+  question      String
+  description   String?
+
+  // Reward Config
+  maxSpread     Float    // Max spread from midpoint (e.g., 0.03 = 3¢)
+  minSize       Float    // Minimum shares to qualify
+  rewardPool    Float    // Daily USD reward amount
+
+  // Market State
+  midpoint      Float    // Current market midpoint
+  volume        Float    @default(0)
+  liquidity     Float    @default(0)
+  endDate       DateTime
+  active        Boolean  @default(true)
+  resolved      Boolean  @default(false)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  snapshots     MarketSnapshot[]
+  positions     Position[]
+  orders        Order[]
+
+  @@index([active, rewardPool])
+  @@index([endDate])
+  @@index([conditionId])
+}
+
+// Market Snapshot (Historical data)
+model MarketSnapshot {
+  id          String   @id @default(cuid())
+  marketId    String
+  market      Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  timestamp   DateTime @default(now())
+  midpoint    Float
+  totalQMin   Float    // Sum of all LPs' Q_min
+  lpCount     Int      // Number of active LPs
+  rewardPool  Float    // Snapshot of reward pool at time
+
+  @@index([marketId, timestamp])
+  @@index([timestamp])
+}
+
+// User Position (Calculated Q-scores)
+model Position {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketId      String
+  market        Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  // Q-Scores
+  qOne          Float
+  qTwo          Float
+  qMin          Float
+
+  // Estimates
+  estimatedDaily  Float
+  userShare       Float    // Percentage (0-1)
+  competitionQMin Float    // Total Q_min of other LPs
+
+  // Metadata
+  capitalDeployed Float
+  orderCount      Int
+
+  calculatedAt    DateTime @default(now())
+
+  @@unique([userId, marketId])
+  @@index([userId])
+  @@index([marketId])
+  @@index([calculatedAt])
+}
+
+// Order (User's open orders)
+model Order {
+  id          String   @id @default(cuid())
+  userId      String
+  marketId    String
+  market      Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  // Order Details
+  price       Float    // 0.0 to 1.0
+  size        Float    // Number of shares
+  side        Side     // YES or NO
+  type        OrderType // BID or ASK
+
+  // Metadata
+  spread      Float    // Distance from midpoint
+  score       Float    // Individual order score
+
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, marketId, active])
+  @@index([marketId, active])
+}
+
+enum Side {
+  YES
+  NO
+}
+
+enum OrderType {
+  BID
+  ASK
+}
+
+// Payout (On-chain reward distributions)
+model Payout {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount        Float
+  date          DateTime
+  txHash        String   @unique
+  blockNumber   Int
+
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([userId, date])
+  @@index([date])
+  @@index([txHash])
+}
+
+// Alert
+model Alert {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        AlertType
+  marketId    String?
+  threshold   Float?
+  active      Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, active])
+}
+
+enum AlertType {
+  COMPETITION      // Competition increased
+  WHALE           // Large LP entered
+  OPPORTUNITY     // New high-reward market
+  PAYOUT          // Daily payout received
+}
+
+// API Cache (Optional - for rate limiting)
+model ApiCache {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  data        Json
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([key])
+  @@index([expiresAt])
+}
