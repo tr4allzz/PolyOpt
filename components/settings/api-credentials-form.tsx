@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,9 +14,11 @@ interface ApiCredentialsFormProps {
 }
 
 export function ApiCredentialsForm({ walletAddress, onCredentialsSaved }: ApiCredentialsFormProps) {
+  const { authenticatedFetch } = useAuth();
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
   const [apiPassphrase, setApiPassphrase] = useState('');
+  const [funderAddress, setFunderAddress] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,14 +34,13 @@ export function ApiCredentialsForm({ walletAddress, onCredentialsSaved }: ApiCre
     setSuccess(false);
 
     try {
-      const response = await fetch('/api/user/credentials', {
+      const response = await authenticatedFetch('/api/user/credentials', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          walletAddress,
           apiKey,
           apiSecret,
           apiPassphrase,
+          funderAddress: funderAddress || undefined, // Only send if provided
         }),
       });
 
@@ -131,6 +133,29 @@ export function ApiCredentialsForm({ walletAddress, onCredentialsSaved }: ApiCre
               placeholder="Your Polymarket API Passphrase"
               className="mt-1"
             />
+          </div>
+
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+            <p className="text-sm font-semibold text-amber-900">Proxy Wallet (Optional)</p>
+            <p className="text-xs text-amber-700">
+              If you use a proxy wallet (common with Magic/MetaMask wallets), enter your trading wallet address here.
+              This is the wallet where your funds are held (check {' '}
+              <a href="https://polymarket.com/portfolio" target="_blank" rel="noopener noreferrer" className="underline">
+                Polymarket Portfolio
+              </a> for your trading address).
+            </p>
+            <Label htmlFor="funderAddress" className="text-sm">Funder/Trading Wallet Address</Label>
+            <Input
+              id="funderAddress"
+              type="text"
+              value={funderAddress}
+              onChange={(e) => setFunderAddress(e.target.value)}
+              placeholder="0x... (leave empty if you don't use a proxy)"
+              className="mt-1 font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Your connected wallet: {walletAddress?.slice(0, 10)}...{walletAddress?.slice(-8)}
+            </p>
           </div>
         </div>
 

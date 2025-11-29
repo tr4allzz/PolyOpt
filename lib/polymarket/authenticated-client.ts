@@ -2,7 +2,9 @@
 // Authenticated Polymarket CLOB REST API client for fetching user orders
 
 import { prisma } from '@/lib/prisma';
+import { decryptCredentials } from '@/lib/crypto/encryption';
 import crypto from 'crypto';
+import axios from 'axios';
 
 const CLOB_API_URL = 'https://clob.polymarket.com';
 
@@ -46,7 +48,7 @@ function createL2AuthHeaders(
 }
 
 /**
- * Fetch user's API credentials from database
+ * Fetch user's API credentials from database and decrypt them
  */
 async function getUserCredentials(walletAddress: string) {
   const user = await prisma.user.findUnique({
@@ -55,6 +57,7 @@ async function getUserCredentials(walletAddress: string) {
       apiKey: true,
       apiSecret: true,
       apiPassphrase: true,
+      funderAddress: true,
     },
   });
 
@@ -63,7 +66,22 @@ async function getUserCredentials(walletAddress: string) {
     return null;
   }
 
-  return user;
+  // Decrypt credentials before returning
+  try {
+    const decrypted = decryptCredentials({
+      apiKey: user.apiKey,
+      apiSecret: user.apiSecret,
+      apiPassphrase: user.apiPassphrase,
+    });
+
+    return {
+      ...decrypted,
+      funderAddress: user.funderAddress, // Pass through funder address (not encrypted)
+    };
+  } catch (error) {
+    console.error('Error decrypting credentials:', error);
+    throw new Error('Failed to decrypt API credentials. They may have been encrypted with a different key.');
+  }
 }
 
 /**
@@ -80,6 +98,14 @@ export async function fetchAuthenticatedOrders(
   }
 
   try {
+    // IMPORTANT: POLY_ADDRESS in API calls must match the wallet that CREATED the API credentials
+    // The API key is tied to the signing wallet (login wallet), not the proxy/funder wallet
+    // The server will return orders for all wallets controlled by this address (including proxy)
+    console.log(`Using address for API calls: ${walletAddress} (login wallet - matches API key owner)`);
+    if (credentials.funderAddress) {
+      console.log(`   Proxy wallet (where funds are held): ${credentials.funderAddress}`);
+    }
+
     // Build query string
     const queryParams = new URLSearchParams();
     if (marketConditionId) {
@@ -91,9 +117,9 @@ export async function fetchAuthenticatedOrders(
 
     console.log(`Fetching open orders from: ${CLOB_API_URL}${path}`);
 
-    // Create authentication headers
+    // Create authentication headers using the LOGIN wallet address (the one that created the API key)
     const authHeaders = createL2AuthHeaders(
-      walletAddress,
+      walletAddress, // Must be the login wallet that derived the API credentials!
       credentials.apiKey!,
       credentials.apiSecret!,
       credentials.apiPassphrase!,
@@ -101,22 +127,27 @@ export async function fetchAuthenticatedOrders(
       path
     );
 
-    // Make authenticated request
-    const response = await fetch(`${CLOB_API_URL}${path}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-      },
+    // Debug: Log auth headers (redacted)
+    console.log('📤 Auth headers:', {
+      POLY_ADDRESS: authHeaders.POLY_ADDRESS,
+      POLY_API_KEY: authHeaders.POLY_API_KEY?.substring(0, 20) + '...',
+      POLY_SIGNATURE: authHeaders.POLY_SIGNATURE?.substring(0, 20) + '...',
+      POLY_TIMESTAMP: authHeaders.POLY_TIMESTAMP,
+      POLY_PASSPHRASE: authHeaders.POLY_PASSPHRASE?.substring(0, 10) + '...',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`API error (${response.status}):`, errorText);
-      throw new Error(`Failed to fetch orders: ${response.status} ${errorText}`);
-    }
+    // Make authenticated request using axios for better reliability
+    const response = await axios.get(`${CLOB_API_URL}${path}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; PolyOpt/1.0)',
+        'Accept': 'application/json',
+        ...authHeaders,
+      },
+      timeout: 10000,
+    });
 
-    const data = await response.json();
+    const data = response.data;
     console.log(`Fetched orders response type:`, typeof data);
 
     // The response might be an array or an object with a data property
@@ -134,8 +165,13 @@ export async function fetchAuthenticatedOrders(
     }
 
     return data;
-  } catch (error) {
-    console.error(`Error fetching authenticated orders:`, error);
+  } catch (error: any) {
+    if (error.response) {
+      // Axios error with response
+      console.error(`API error (${error.response.status}):`, error.response.data);
+      throw new Error(`Failed to fetch orders: ${error.response.status} ${JSON.stringify(error.response.data)}`);
+    }
+    console.error(`Error fetching authenticated orders:`, error.message);
     throw error;
   }
 }

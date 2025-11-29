@@ -1,153 +1,119 @@
 // app/api/user/credentials/route.ts
 // Save and manage Polymarket API credentials for authenticated access
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { encryptCredentials } from '@/lib/crypto/encryption';
+import { withErrorHandler, ValidationError } from '@/lib/errors/handler';
+import { requireAuth } from '@/lib/auth/middleware';
 
 const CredentialsSchema = z.object({
-  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
   apiKey: z.string().min(1),
   apiSecret: z.string().min(1),
   apiPassphrase: z.string().min(1),
+  funderAddress: z.string().optional(), // Optional proxy wallet address
 });
 
 /**
  * POST /api/user/credentials
  * Save Polymarket API credentials for a user
+ * Credentials are encrypted before storage
+ * Requires authentication - wallet signature verification
  */
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { walletAddress, apiKey, apiSecret, apiPassphrase } = CredentialsSchema.parse(body);
+export const POST = requireAuth(async (request: NextRequest, auth) => {
+  const body = await request.json();
+  const { apiKey, apiSecret, apiPassphrase, funderAddress } = CredentialsSchema.parse(body);
 
-    console.log(`💾 Saving API credentials for wallet ${walletAddress}`);
+  const walletAddress = auth.walletAddress;
 
-    // Create or update user with API credentials
-    const user = await prisma.user.upsert({
-      where: { walletAddress },
-      create: {
-        walletAddress,
-        apiKey,
-        apiSecret,
-        apiPassphrase,
-        apiCreatedAt: new Date(),
-      },
-      update: {
-        apiKey,
-        apiSecret,
-        apiPassphrase,
-        apiCreatedAt: new Date(),
-      },
-    });
-
-    console.log(`✅ API credentials saved for ${walletAddress}`);
-
-    return NextResponse.json({
-      success: true,
-      message: 'API credentials saved successfully',
-      hasCredentials: true,
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
-    }
-
-    console.error('Error saving credentials:', error);
-    return NextResponse.json(
-      { error: 'Failed to save credentials' },
-      { status: 500 }
-    );
+  console.log(`💾 Saving API credentials for wallet ${walletAddress}`);
+  if (funderAddress) {
+    console.log(`   Funder/proxy wallet: ${funderAddress}`);
   }
-}
+
+  // Encrypt credentials before saving
+  const encrypted = encryptCredentials({
+    apiKey,
+    apiSecret,
+    apiPassphrase,
+  });
+
+  // Create or update user with encrypted API credentials
+  const user = await prisma.user.upsert({
+    where: { walletAddress },
+    create: {
+      walletAddress,
+      apiKey: encrypted.apiKey,
+      apiSecret: encrypted.apiSecret,
+      apiPassphrase: encrypted.apiPassphrase,
+      funderAddress: funderAddress || null,
+      apiCreatedAt: new Date(),
+    },
+    update: {
+      apiKey: encrypted.apiKey,
+      apiSecret: encrypted.apiSecret,
+      apiPassphrase: encrypted.apiPassphrase,
+      funderAddress: funderAddress || null,
+      apiCreatedAt: new Date(),
+    },
+  });
+
+  console.log(`✅ API credentials saved (encrypted) for ${walletAddress}`);
+
+  return NextResponse.json({
+    success: true,
+    message: 'API credentials saved successfully',
+    hasCredentials: true,
+  });
+});
 
 /**
- * GET /api/user/credentials?walletAddress=0x...
+ * GET /api/user/credentials
  * Check if user has API credentials saved
+ * Requires authentication - wallet signature verification
  */
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const walletAddress = searchParams.get('walletAddress');
+export const GET = requireAuth(async (request: NextRequest, auth) => {
+  const walletAddress = auth.walletAddress;
 
-    if (!walletAddress) {
-      return NextResponse.json(
-        { error: 'walletAddress parameter is required' },
-        { status: 400 }
-      );
-    }
+  const user = await prisma.user.findUnique({
+    where: { walletAddress },
+    select: {
+      apiKey: true,
+      apiCreatedAt: true,
+    },
+  });
 
-    // Validate wallet address format
-    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-      return NextResponse.json(
-        { error: 'Invalid wallet address format' },
-        { status: 400 }
-      );
-    }
+  const hasCredentials = !!(user && user.apiKey);
 
-    const user = await prisma.user.findUnique({
-      where: { walletAddress },
-      select: {
-        apiKey: true,
-        apiCreatedAt: true,
-      },
-    });
-
-    const hasCredentials = !!(user && user.apiKey);
-
-    return NextResponse.json({
-      hasCredentials,
-      createdAt: user?.apiCreatedAt || null,
-    });
-  } catch (error) {
-    console.error('Error checking credentials:', error);
-    return NextResponse.json(
-      { error: 'Failed to check credentials' },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({
+    hasCredentials,
+    createdAt: user?.apiCreatedAt || null,
+  });
+});
 
 /**
- * DELETE /api/user/credentials?walletAddress=0x...
+ * DELETE /api/user/credentials
  * Delete user's API credentials
+ * Requires authentication - wallet signature verification
  */
-export async function DELETE(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const walletAddress = searchParams.get('walletAddress');
+export const DELETE = requireAuth(async (request: NextRequest, auth) => {
+  const walletAddress = auth.walletAddress;
 
-    if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-      return NextResponse.json(
-        { error: 'Invalid wallet address' },
-        { status: 400 }
-      );
-    }
+  await prisma.user.update({
+    where: { walletAddress },
+    data: {
+      apiKey: null,
+      apiSecret: null,
+      apiPassphrase: null,
+      apiCreatedAt: null,
+    },
+  });
 
-    await prisma.user.update({
-      where: { walletAddress },
-      data: {
-        apiKey: null,
-        apiSecret: null,
-        apiPassphrase: null,
-        apiCreatedAt: null,
-      },
-    });
+  console.log(`🗑️ API credentials deleted for ${walletAddress}`);
 
-    console.log(`🗑️ API credentials deleted for ${walletAddress}`);
-
-    return NextResponse.json({
-      success: true,
-      message: 'API credentials deleted successfully',
-    });
-  } catch (error) {
-    console.error('Error deleting credentials:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete credentials' },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({
+    success: true,
+    message: 'API credentials deleted successfully',
+  });
+});

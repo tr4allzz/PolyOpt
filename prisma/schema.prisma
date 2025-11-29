@@ -27,6 +27,10 @@ model User {
   apiPassphrase String?
   apiCreatedAt  DateTime?
 
+  // Funder address (proxy wallet where funds are held - for proxy wallets only)
+  // If not set, walletAddress is used (for direct EOA wallets)
+  funderAddress String?
+
   // Relations
   positions     Position[]
   payouts       Payout[]
@@ -71,6 +75,8 @@ model Market {
   orders        Order[]
 
   @@index([active, rewardPool])
+  @@index([active, rewardPool, endDate])  // Composite index for market queries
+  @@index([active, endDate])              // For filtering active markets by date
   @@index([endDate])
   @@index([conditionId])
 }
@@ -117,6 +123,7 @@ model Position {
 
   @@unique([userId, marketId])
   @@index([userId])
+  @@index([userId, estimatedDaily])  // For sorting user positions by rewards
   @@index([marketId])
   @@index([calculatedAt])
 }
@@ -143,6 +150,7 @@ model Order {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, marketId, active])
+  @@index([userId, active])  // For fetching all user's active orders
   @@index([marketId, active])
 }
 
@@ -208,4 +216,112 @@ model ApiCache {
 
   @@index([key])
   @@index([expiresAt])
+}
+
+// Bot Configuration
+model BotConfig {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+
+  // Status
+  enabled             Boolean  @default(false)
+
+  // Capital Management
+  maxCapitalPerMarket Float    @default(1000) // Max $ per market
+  totalCapitalLimit   Float    @default(10000) // Total $ across all markets
+  reserveCapital      Float    @default(1000) // Keep this much in reserve
+
+  // Risk Parameters
+  minQScore           Float    @default(0.5) // Minimum Q-score to consider
+  minRewardPool       Float    @default(50) // Minimum daily reward pool ($)
+  maxMarketsActive    Int      @default(10) // Max concurrent markets
+
+  // Strategy
+  autoScanInterval    Int      @default(3600) // Scan every N seconds (default 1h)
+  requireApproval     Boolean  @default(true) // Require manual approval before execution
+
+  // Advanced
+  diversificationMode Boolean  @default(true) // Spread capital across markets
+  rebalanceEnabled    Boolean  @default(false) // Auto-rebalance positions
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Bot Recommendation (Opportunities found by bot)
+model BotRecommendation {
+  id                String   @id @default(cuid())
+  userId            String
+  marketId          String
+
+  // Opportunity Details
+  qScore            Float
+  estimatedDaily    Float
+  capitalRequired   Float
+  rewardPool        Float
+
+  // Recommended Actions
+  recommendedOrders Json     // Array of { price, size, side, type }
+  reasoning         String   // Why this is a good opportunity
+  priority          Priority @default(MEDIUM)
+
+  // Status
+  status            RecommendationStatus @default(PENDING)
+  approvedAt        DateTime?
+  executedAt        DateTime?
+  rejectedAt        DateTime?
+
+  // Results (if executed)
+  executionResult   Json?    // Details of what happened
+  ordersPlaced      Int      @default(0)
+
+  createdAt         DateTime @default(now())
+  expiresAt         DateTime // Recommendations expire after N hours
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@index([createdAt])
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum RecommendationStatus {
+  PENDING         // Waiting for user approval
+  APPROVED        // User approved, waiting execution
+  EXECUTING       // Currently being executed
+  EXECUTED        // Successfully executed
+  REJECTED        // User rejected
+  EXPIRED         // Recommendation expired
+  FAILED          // Execution failed
+}
+
+// Bot Execution Log
+model BotExecutionLog {
+  id                  String   @id @default(cuid())
+  userId              String
+  recommendationId    String?
+
+  action              String   // "scan", "execute", "rebalance", etc.
+  status              String   // "success", "error", "partial"
+
+  // Details
+  marketsScanned      Int      @default(0)
+  opportunitiesFound  Int      @default(0)
+  ordersPlaced        Int      @default(0)
+  capitalDeployed     Float    @default(0)
+
+  errorMessage        String?
+  executionTime       Int      // milliseconds
+
+  createdAt           DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action])
 }

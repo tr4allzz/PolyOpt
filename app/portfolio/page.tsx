@@ -1,176 +1,180 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useAccount } from 'wagmi'
+import { useState } from 'react'
+import { useAccount, useSignMessage, useSignTypedData } from 'wagmi'
+import { usePortfolioData } from '@/hooks/usePortfolioData'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { formatUSD } from '@/lib/polymarket/utils'
-import Link from 'next/link'
-import { ExternalLink, Loader2, Scan, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ApiCredentialsForm } from '@/components/settings/api-credentials-form'
-import { WalletCredentialsGenerator } from '@/components/settings/wallet-credentials-generator'
+import { formatUSD } from '@/lib/polymarket/utils'
+import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react'
+import { format } from 'date-fns'
+import Link from 'next/link'
+import { toast } from 'sonner'
 
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount()
-  const [positions, setPositions] = useState<any>(null)
-  const [rewards, setRewards] = useState<any>(null)
-  const [pendingRewards, setPendingRewards] = useState<any>(null)
-  const [recommendations, setRecommendations] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [loadingRewards, setLoadingRewards] = useState(false)
-  const [loadingPending, setLoadingPending] = useState(false)
-  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
-  const [scanning, setScanning] = useState(false)
-  const [scanResults, setScanResults] = useState<any>(null)
-  const [hasCredentials, setHasCredentials] = useState<boolean | null>(null)
-  const [showCredentialsForm, setShowCredentialsForm] = useState(false)
+  const { data, isLoading, error, refetch } = usePortfolioData()
+  const [isAutoSetting, setIsAutoSetting] = useState(false)
+  const [autoSetupError, setAutoSetupError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!isConnected || !address) {
-      setPositions(null)
-      setRewards(null)
-      setPendingRewards(null)
-      setRecommendations(null)
-      setHasCredentials(null)
-      return
-    }
+  // Wagmi hooks for signing
+  const { signMessageAsync } = useSignMessage()
+  const { signTypedDataAsync } = useSignTypedData()
 
-    fetchPositions()
-    fetchRewards()
-    fetchPendingRewards()
-    fetchRecommendations()
-    checkCredentials()
-  }, [address, isConnected])
+  const rewards = data?.rewards || null
+  const activePositions = data?.activePositions || null
+  const positions = data?.positions || null
+  const openOrders = data?.openOrders || null
+  const hasCredentials = data?.hasCredentials || false
 
-  async function checkCredentials() {
+  // Auto-setup API credentials
+  const handleAutoSetup = async () => {
     if (!address) return
 
+    setIsAutoSetting(true)
+    setAutoSetupError(null)
+
     try {
-      const response = await fetch(`/api/user/credentials?walletAddress=${address}`)
-      if (response.ok) {
-        const data = await response.json()
-        setHasCredentials(data.hasCredentials)
-      }
-    } catch (error) {
-      console.error('Error checking credentials:', error)
-    }
-  }
 
-  async function fetchPositions() {
-    if (!address) return
+      // Step 1: Authenticate with our API
+      const authTimestamp = Date.now()
+      const authMessage = `PolyOpt Authentication\n\nWallet: ${address}\nTimestamp: ${authTimestamp}\n\nThis signature proves you own this wallet and authorizes access to your data.`
 
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/user/positions?walletAddress=${address}`)
-      if (response.ok) {
-        const data = await response.json()
-        setPositions(data)
-      }
-    } catch (error) {
-      console.error('Error fetching positions:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function fetchRewards() {
-    if (!address) return
-
-    setLoadingRewards(true)
-    try {
-      const response = await fetch(`/api/user/rewards?walletAddress=${address}`)
-      if (response.ok) {
-        const data = await response.json()
-        setRewards(data)
-      }
-    } catch (error) {
-      console.error('Error fetching rewards:', error)
-    } finally {
-      setLoadingRewards(false)
-    }
-  }
-
-  async function fetchPendingRewards() {
-    if (!address) return
-
-    setLoadingPending(true)
-    try {
-      const response = await fetch(`/api/user/pending-rewards?walletAddress=${address}`)
-      if (response.ok) {
-        const data = await response.json()
-        setPendingRewards(data)
-      }
-    } catch (error) {
-      console.error('Error fetching pending rewards:', error)
-    } finally {
-      setLoadingPending(false)
-    }
-  }
-
-  async function fetchRecommendations() {
-    if (!address) return
-
-    setLoadingRecommendations(true)
-    try {
-      const response = await fetch(`/api/user/recommendations?walletAddress=${address}`)
-      if (response.ok) {
-        const data = await response.json()
-        setRecommendations(data)
-      }
-    } catch (error) {
-      console.error('Error fetching recommendations:', error)
-    } finally {
-      setLoadingRecommendations(false)
-    }
-  }
-
-  async function scanPositions() {
-    if (!address) return
-
-    setScanning(true)
-    setScanResults(null)
-    try {
-      const response = await fetch('/api/user/scan-positions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: address }),
+      const authSignature = await signMessageAsync({
+        message: authMessage,
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        console.log(`Scan complete:`, data)
-        setScanResults(data)
-        // Refresh positions and rewards after scan
-        setLoading(true)
-        await fetchPositions()
-        await fetchRewards()
-        await fetchPendingRewards()
-        await fetchRecommendations()
-      } else {
-        const errorData = await response.json()
-        console.error('Scan failed:', errorData)
-        alert(`Scan failed: ${errorData.error || 'Unknown error'}`)
+
+      // Step 2: Sign EIP-712 message for Polymarket
+      // According to Polymarket docs, nonce defaults to 0 for API key creation
+      const timestamp = Math.floor(Date.now() / 1000)
+      const nonce = 0 // Default nonce for creating new API credentials
+
+      const domain = {
+        name: 'ClobAuthDomain',
+        version: '1',
+        chainId: 137, // Polygon
+      } as const
+
+      const types = {
+        ClobAuth: [
+          { name: 'address', type: 'address' },
+          { name: 'timestamp', type: 'string' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'message', type: 'string' },
+        ],
+      } as const
+
+      const message = {
+        address: address,
+        timestamp: timestamp.toString(),
+        nonce: BigInt(nonce),
+        message: 'This message attests that I control the given wallet',
       }
-    } catch (error) {
-      console.error('Error scanning positions:', error)
-      alert('Error scanning positions. Please check the console for details.')
+
+      const polySignature = await signTypedDataAsync({
+        domain,
+        types,
+        primaryType: 'ClobAuth',
+        message,
+      })
+
+
+      // Step 4: Call auto-setup endpoint with Polymarket signature and nonce
+      const response = await fetch('/api/user/auto-setup-api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Wallet-Address': address,
+          'X-Signature': authSignature,
+          'X-Timestamp': authTimestamp.toString(),
+        },
+        body: JSON.stringify({
+          signature: polySignature,
+          timestamp,
+          nonce,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        toast.success('API credentials configured!', { description: 'Your open orders are now being tracked' })
+        // Refresh data
+        await refetch?.()
+        setAutoSetupError(null)
+      } else {
+        // Auto-setup failed, show manual setup option
+        setAutoSetupError(result.error || 'Auto-setup failed. Please use manual setup.')
+      }
+    } catch (error: any) {
+      console.error('Auto-setup error:', error)
+      setAutoSetupError(error.message || 'Failed to auto-setup. Please use manual setup.')
     } finally {
-      setScanning(false)
+      setIsAutoSetting(false)
     }
   }
 
+  // Loading state
+  if (isConnected && isLoading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 container py-16">
+          <div className="max-w-2xl mx-auto text-center space-y-6">
+            <Loader2 className="h-16 w-16 mx-auto animate-spin text-primary" />
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Loading Your Portfolio</h2>
+              <p className="text-muted-foreground">
+                Please sign the message in your wallet to verify ownership
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                This is free and doesn't cost any gas • Signature cached for 4 minutes
+              </p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 container py-16">
+          <div className="max-w-2xl mx-auto text-center space-y-6">
+            <AlertCircle className="h-16 w-16 mx-auto text-red-500" />
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Error Loading Portfolio</h2>
+              <p className="text-muted-foreground">{error.message}</p>
+            </div>
+            <Button onClick={() => refetch?.()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Not connected state
   if (!isConnected) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
-        <main className="flex-1 container py-8">
-          <div className="text-center py-12">
-            <h1 className="text-2xl font-bold mb-4">Connect Your Wallet</h1>
-            <p className="text-muted-foreground">
-              Connect your wallet to view your portfolio
+        <main className="flex-1 container py-16">
+          <div className="max-w-2xl mx-auto text-center space-y-6">
+            <Wallet className="h-20 w-20 mx-auto text-muted-foreground" />
+            <h1 className="text-4xl font-bold">Connect Your Wallet</h1>
+            <p className="text-lg text-muted-foreground">
+              See your Polymarket earnings and positions instantly
             </p>
           </div>
         </main>
@@ -182,431 +186,574 @@ export default function PortfolioPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-
       <main className="flex-1 container py-8">
-        <div className="mb-8">
-          <div className="flex items-start justify-between">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Page Header */}
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold mb-2">Portfolio</h1>
-              <p className="text-muted-foreground">
-                Your active positions and expected rewards
+              <h1 className="text-3xl font-bold">Portfolio</h1>
+              <p className="text-muted-foreground">Track your earnings and active positions</p>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">
+                Wallet: {address?.slice(0, 6)}...{address?.slice(-4)}
               </p>
             </div>
-            <div className="flex gap-2">
-              {hasCredentials === false && (
-                <Button onClick={() => setShowCredentialsForm(!showCredentialsForm)} variant="outline">
-                  <Settings className="mr-2 h-4 w-4" />
-                  {showCredentialsForm ? 'Hide' : 'Setup API'}
-                </Button>
-              )}
-              <Button onClick={scanPositions} disabled={scanning || loading || hasCredentials === false}>
-                {scanning ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch?.()}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Earned
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatUSD(rewards?.summary?.totalEarned || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {rewards?.summary?.totalRewards || 0} total reward{rewards?.summary?.totalRewards !== 1 ? 's' : ''}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Open Orders
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {openOrders?.summary?.totalOrders || 0}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {openOrders?.summary?.totalOrders ? 'Earning rewards' : hasCredentials ? 'No open orders' : 'API setup required'}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Last Reward
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {rewards?.rewards?.[0] ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Scanning...
+                    <div className="text-2xl font-bold text-green-600">
+                      +{formatUSD(parseFloat(rewards.rewards[0].usdcSize || rewards.rewards[0].cash_amount || 0))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {format(new Date(rewards.rewards[0].timestamp * 1000), 'MMM d, yyyy')}
+                    </p>
                   </>
                 ) : (
                   <>
-                    <Scan className="mr-2 h-4 w-4" />
-                    Scan for Positions
+                    <div className="text-2xl font-bold text-muted-foreground">$0.00</div>
+                    <p className="text-xs text-muted-foreground mt-1">No rewards yet</p>
                   </>
                 )}
-              </Button>
-            </div>
+              </CardContent>
+            </Card>
           </div>
-        </div>
 
-        {/* API Credentials Setup */}
-        {showCredentialsForm && address && (
-          <div className="mb-8 space-y-6">
-            {/* Automatic Generation (Recommended) */}
-            <WalletCredentialsGenerator
-              onCredentialsGenerated={() => {
-                setShowCredentialsForm(false);
-                checkCredentials();
-              }}
-            />
+          {/* Open Orders (Earning Rewards) - Requires API Credentials */}
+          {!hasCredentials ? (
+            <Card className="border-blue-500 border-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-blue-500" />
+                  Open Orders (Earning Rewards)
+                </CardTitle>
+                <CardDescription>Your limit orders on the book that earn maker rewards</CardDescription>
+              </CardHeader>
+              <CardContent className="text-center py-8">
+                <AlertCircle className="h-12 w-12 mx-auto text-blue-500 mb-4" />
+                <p className="font-medium mb-2">Setup Required to View Open Orders</p>
+                <p className="text-sm text-muted-foreground mb-6">
+                  To see your limit orders (the ones earning maker rewards), we need to connect to Polymarket's API.
+                </p>
 
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or enter manually
-                </span>
-              </div>
-            </div>
+                <div className="space-y-4">
+                  {!autoSetupError ? (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-left">
+                      <p className="text-sm font-semibold text-blue-900 mb-2">✨ Quick Setup (Recommended)</p>
+                      <p className="text-xs text-blue-800 mb-3">
+                        We can automatically derive your API credentials from your wallet signature. This takes 30 seconds and requires just one signature.
+                      </p>
+                      <Button
+                        onClick={handleAutoSetup}
+                        disabled={isAutoSetting}
+                        className="w-full"
+                      >
+                        {isAutoSetting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Setting up...
+                          </>
+                        ) : (
+                          'Auto-Setup API Access'
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-left">
+                      <p className="text-sm font-semibold text-amber-900 mb-2">⚠️ Auto-Setup Failed</p>
+                      <p className="text-xs text-amber-800 mb-3">
+                        {autoSetupError}
+                      </p>
+                      <Button
+                        onClick={() => setAutoSetupError(null)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
 
-            {/* Manual Entry */}
-            <ApiCredentialsForm
-              walletAddress={address}
-              onCredentialsSaved={() => {
-                setShowCredentialsForm(false);
-                checkCredentials();
-              }}
-            />
-          </div>
-        )}
-
-        {/* Need Credentials Message */}
-        {hasCredentials === false && !showCredentialsForm && (
-          <Card className="mb-8 border-yellow-500 bg-yellow-50/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-yellow-800">
-                <Settings className="h-5 w-5" />
-                API Credentials Required
-              </CardTitle>
-              <CardDescription>
-                To automatically scan for your positions, you need to configure your Polymarket API credentials.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => setShowCredentialsForm(true)}>
-                <Settings className="mr-2 h-4 w-4" />
-                Setup API Credentials
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Scan Results */}
-        {scanResults && scanResults.marketsWithPositions && scanResults.marketsWithPositions.length > 0 && (
-          <Card className="mb-8 border-blue-500 bg-blue-50/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Scan className="h-5 w-5 text-blue-600" />
-                Markets Detected with Your Holdings
-              </CardTitle>
-              <CardDescription>
-                {scanResults.message}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {scanResults.marketsWithPositions.map((market: any) => (
-                <div key={market.id} className="flex items-center justify-between p-3 bg-white rounded border">
-                  <div className="flex-1">
-                    <p className="font-medium">{market.question}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Q-Score</p>
-                        <p className="text-sm font-semibold">{market.qMin?.toFixed(2) || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Max Daily</p>
-                        <p className="text-sm font-semibold text-orange-600">{formatUSD(market.estimatedDaily || 0)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Capital</p>
-                        <p className="text-sm font-semibold">{formatUSD(market.capitalDeployed || 0)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Orders</p>
-                        <p className="text-sm font-semibold">{market.orderCount || 0}</p>
-                      </div>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">
+                        Or use manual setup
+                      </span>
                     </div>
                   </div>
-                  <Link href={`/markets/${market.id}`}>
-                    <Button size="sm">
-                      View Details
-                      <ExternalLink className="ml-2 h-3 w-3" />
+
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-left">
+                    <p className="text-sm font-semibold text-gray-900 mb-2">🔧 Manual Setup</p>
+                    <p className="text-xs text-gray-700 mb-3">
+                      Create API credentials on Polymarket and enter them manually.
+                    </p>
+                    <div className="flex gap-3">
+                      <Button asChild variant="outline" size="sm">
+                        <a
+                          href="https://polymarket.com/settings/api"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Get API Keys
+                          <ExternalLink className="ml-2 h-3 w-3" />
+                        </a>
+                      </Button>
+                      <Link href="/settings">
+                        <Button size="sm">Enter in Settings</Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : openOrders && openOrders.orders && openOrders.orders.length > 0 ? (
+            <Card className="border-green-500 border-2">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-green-500" />
+                      Open Orders (Earning Rewards)
+                    </CardTitle>
+                    <CardDescription>Your active limit orders earning maker rewards</CardDescription>
+                  </div>
+                  <div className="text-sm font-medium text-green-600">
+                    {openOrders.summary.totalOrders} order{openOrders.summary.totalOrders !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-xs text-green-900">
+                    <strong>✅ These orders earn rewards!</strong> Your limit orders are on the order book providing liquidity.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {openOrders.orders.slice(0, 20).map((order: any, i: number) => (
+                    <div
+                      key={order.id || i}
+                      className="flex items-center justify-between py-3 border-b last:border-0"
+                    >
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium px-2 py-1 rounded ${
+                            order.side === 'BUY'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {order.side}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${
+                            order.outcome === 'Yes' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                          }`}>
+                            {order.outcome || (order.side === 'BUY' ? 'Yes' : 'No')}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium mt-1">
+                          {order.marketName || order.market || 'Loading market...'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Price: ${parseFloat(order.price || 0).toFixed(4)} •
+                          Size: {parseFloat(order.size || order.original_size || 0).toFixed(0)} shares
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-medium text-green-600">
+                          Earning Rewards
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {openOrders.orders.length > 20 && (
+                  <p className="text-sm text-muted-foreground text-center mt-4">
+                    + {openOrders.orders.length - 20} more orders
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ) : hasCredentials ? (
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Open Orders (Earning Rewards)
+                </CardTitle>
+                <CardDescription>Your active limit orders earning maker rewards</CardDescription>
+              </CardHeader>
+              <CardContent className="text-center py-8">
+                <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="font-medium mb-2">No Open Orders</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  You don't have any limit orders on the book. Place limit orders on Polymarket to earn maker rewards.
+                </p>
+                <Button asChild variant="outline">
+                  <a
+                    href="https://polymarket.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Go to Polymarket
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Active Positions - From Public API (no credentials needed!) */}
+          {activePositions && activePositions.positions && activePositions.positions.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Active Positions</CardTitle>
+                    <CardDescription>Your positions in open markets (not yet resolved)</CardDescription>
+                  </div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    {activePositions.summary.totalPositions} open market{activePositions.summary.totalPositions !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3 mb-4">
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Total Value</p>
+                    <p className="text-lg font-bold">{formatUSD(activePositions.summary.totalValue)}</p>
+                  </div>
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Total PnL</p>
+                    <p className={`text-lg font-bold ${activePositions.summary.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {activePositions.summary.totalPnl >= 0 ? '+' : ''}{formatUSD(activePositions.summary.totalPnl)}
+                    </p>
+                  </div>
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Markets</p>
+                    <p className="text-lg font-bold">{activePositions.summary.totalPositions}</p>
+                  </div>
+                </div>
+
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-900">
+                    <strong>💡 Note:</strong> These are your current positions (shares held) in open markets.
+                    To earn maker rewards, you need active limit orders on the order book, not just positions.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {activePositions.positions.slice(0, 10).map((position: any, i: number) => (
+                    <div
+                      key={position.asset || i}
+                      className="flex items-center justify-between py-3 border-b last:border-0"
+                    >
+                      <div className="space-y-1 flex-1">
+                        <p className="font-medium text-sm">{position.title}</p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className={`font-medium ${
+                            position.outcome === 'Yes' ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {position.outcome}
+                          </span>
+                          <span>•</span>
+                          <span>{position.size.toFixed(0)} shares @ {formatUSD(position.avgPrice)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <p className="text-sm font-medium">{formatUSD(position.currentValue)}</p>
+                        <p className={`text-xs font-medium ${position.cashPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {position.cashPnl >= 0 ? '+' : ''}{formatUSD(position.cashPnl)} ({position.percentPnl >= 0 ? '+' : ''}{position.percentPnl.toFixed(1)}%)
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {activePositions.positions.length > 10 && (
+                  <p className="text-sm text-muted-foreground text-center mt-4">
+                    + {activePositions.positions.length - 10} more positions
+                  </p>
+                )}
+                <Button asChild variant="outline" className="w-full mt-4">
+                  <a
+                    href="https://polymarket.com/portfolio"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View on Polymarket
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle>Active Positions</CardTitle>
+                <CardDescription>Your current market positions</CardDescription>
+              </CardHeader>
+              <CardContent className="text-center py-8">
+                <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="font-medium mb-2">No Active Positions</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Start trading on Polymarket to see your positions here
+                </p>
+                <Button asChild variant="outline">
+                  <a
+                    href="https://polymarket.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Go to Polymarket
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {positions && positions.positions && positions.positions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Your Markets</CardTitle>
+                    <CardDescription>
+                      Markets where you have active positions (scanned from your portfolio)
+                    </CardDescription>
+                  </div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    {positions.summary.totalMarkets} market{positions.summary.totalMarkets !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {positions.positions.map((position: any, i: number) => (
+                    <div
+                      key={position.marketId}
+                      className="flex items-center justify-between py-3 border-b last:border-0"
+                    >
+                      <div className="space-y-1 flex-1">
+                        <Link
+                          href={`/markets/${position.marketId}`}
+                          className="font-medium text-sm hover:underline"
+                        >
+                          {position.market.question}
+                        </Link>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span>{position.orderCount} order{position.orderCount !== 1 ? 's' : ''}</span>
+                          <span>•</span>
+                          <span>Capital: {formatUSD(position.capitalDeployed)}</span>
+                          {position.estimatedDaily > 0 && (
+                            <>
+                              <span>•</span>
+                              <span className="text-green-600">
+                                Est. {formatUSD(position.estimatedDaily)}/day
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {position.market.active ? (
+                          <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">
+                            Ended
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-4 border-t">
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Total Capital</p>
+                      <p className="text-lg font-bold">{formatUSD(positions.summary.totalCapitalDeployed)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Est. Daily Rewards</p>
+                      <p className="text-lg font-bold text-green-600">
+                        {formatUSD(positions.summary.totalDailyReward)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Rewards */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Rewards</CardTitle>
+                  <CardDescription>Your latest earnings</CardDescription>
+                </div>
+                {rewards?.rewards?.length > 5 && (
+                  <Link href="/history">
+                    <Button variant="ghost" size="sm">
+                      View All
+                      <ExternalLink className="ml-2 h-4 w-4" />
                     </Button>
                   </Link>
-                </div>
-              ))}
-              <p className="text-sm text-muted-foreground pt-2">
-                {scanResults.positionsCalculated} positions calculated and saved to your portfolio.
-                {scanResults.totalMarkets > scanResults.positionsCalculated &&
-                  ` (${scanResults.totalMarkets - scanResults.positionsCalculated} markets skipped - no rewards)`
-                }
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Actual Rewards Earned */}
-        {rewards && rewards.summary && (
-          <Card className="mb-8 border-green-500 bg-green-50/50">
-            <CardHeader>
-              <CardTitle className="text-green-800">💰 Total Rewards Earned</CardTitle>
-              <CardDescription>
-                Actual rewards paid by Polymarket for providing liquidity
-              </CardDescription>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-green-600 mb-4">
-                {formatUSD(rewards.summary.totalEarned)}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {rewards.summary.totalRewards} reward payments received
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Pending Rewards (Accrued but not yet paid) */}
-        {pendingRewards && pendingRewards.pendingRewards > 0 && (
-          <Card className="mb-8 border-blue-500 bg-blue-50/50">
-            <CardHeader>
-              <CardTitle className="text-blue-800">⏳ Pending Rewards</CardTitle>
-              <CardDescription>
-                Estimated rewards accrued but not yet paid out
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-blue-600 mb-4">
-                ~{formatUSD(pendingRewards.pendingRewards)}
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm text-muted-foreground">
-                  Accrued over {pendingRewards.daysElapsed?.toFixed(1)} days
-                  {pendingRewards.lastPayoutDate && (
-                    <> since last payout on {new Date(pendingRewards.lastPayoutDate).toLocaleDateString()}</>
-                  )}
-                </div>
-                {pendingRewards.marketSharePercent && (
-                  <div className="text-sm font-medium text-blue-700 bg-blue-100 rounded px-3 py-2">
-                    📊 Your historical market share: {pendingRewards.marketSharePercent.toFixed(1)}%
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {pendingRewards.marketShareSource}
-                    </div>
-                  </div>
-                )}
-                <div className="text-xs text-muted-foreground border-t pt-2">
-                  ℹ️ {pendingRewards.estimateNote}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Optimization Recommendations */}
-        {recommendations && recommendations.recommendations && recommendations.recommendations.length > 0 && (
-          <Card className="mb-8 border-purple-500 bg-purple-50/50">
-            <CardHeader>
-              <CardTitle className="text-purple-800">🎯 Optimization Recommendations</CardTitle>
-              <CardDescription>
-                Personalized insights to maximize your rewards
-                {recommendations.summary?.totalPotentialGain > 0 && (
-                  <> • Potential: +{formatUSD(recommendations.summary.totalPotentialGain)}/day (+{formatUSD(recommendations.summary.potentialMonthlyGain)}/month)</>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {recommendations.recommendations.slice(0, 5).map((rec: any, index: number) => (
-                <div key={index} className={`p-4 rounded border ${
-                  rec.priority === 'high' ? 'border-red-300 bg-red-50' :
-                  rec.priority === 'medium' ? 'border-yellow-300 bg-yellow-50' :
-                  'border-gray-300 bg-gray-50'
-                }`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant={rec.priority === 'high' ? 'destructive' : rec.priority === 'medium' ? 'default' : 'secondary'}>
-                          {rec.priority.toUpperCase()}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {rec.type === 'rebalance' && '↔️ Rebalance'}
-                          {rec.type === 'increase' && '⬆️ Increase'}
-                          {rec.type === 'exit' && '🚪 Exit'}
-                          {rec.type === 'opportunity' && '✨ Opportunity'}
-                          {rec.type === 'diversify' && '📊 Diversify'}
-                        </span>
+              {rewards?.rewards?.length > 0 ? (
+                <div className="space-y-3">
+                  {rewards.rewards.slice(0, 5).map((reward: any, i: number) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-3 border-b last:border-0"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-medium text-sm">
+                          {reward.description || 'Market Maker Reward'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(reward.timestamp * 1000), 'MMM d, yyyy')}
+                        </p>
                       </div>
-                      <h3 className="font-semibold text-sm">{rec.title}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">{rec.description}</p>
-                      <p className="text-sm font-medium mt-2 text-purple-700">
-                        💡 {rec.action}
-                      </p>
-                      <p className="text-xs text-green-600 font-medium mt-1">
-                        {rec.impact}
-                      </p>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-green-600">
+                          +{formatUSD(parseFloat(reward.usdcSize || reward.cash_amount || 0))}
+                        </p>
+                      </div>
                     </div>
-                    {rec.marketId && (
-                      <Link href={`/markets/${rec.marketId}`}>
-                        <Button size="sm" variant="outline">
-                          View Market
-                          <ExternalLink className="ml-2 h-3 w-3" />
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ))}
-              {recommendations.recommendations.length > 5 && (
-                <p className="text-sm text-muted-foreground text-center pt-2">
-                  +{recommendations.recommendations.length - 5} more recommendations available
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Debug info if scan found positions but they don't show up */}
-        {!loading && scanResults && scanResults.positionsCalculated > 0 && (!positions || positions.summary.totalMarkets === 0) && (
-          <Card className="mb-8 border-yellow-500 bg-yellow-50/50">
-            <CardHeader>
-              <CardTitle className="text-yellow-800">Positions Not Loading</CardTitle>
-              <CardDescription>
-                The scan found {scanResults.positionsCalculated} positions but they're not appearing in the list below.
-                This may indicate a database sync issue.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => { fetchPositions(); fetchRewards(); fetchPendingRewards(); fetchRecommendations(); }}>
-                Retry Fetching Positions
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {loading ? (
-          <div className="text-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">Loading portfolio...</p>
-          </div>
-        ) : positions && positions.summary ? (
-          <>
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold text-muted-foreground">Portfolio Overview</h2>
-              <p className="text-sm text-muted-foreground">Your active positions and earning potential</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Markets
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">{positions.summary.totalMarkets}</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Max Daily (100%)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">
-                    {formatUSD(positions.summary.totalDailyReward)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">if no competition</p>
-                </CardContent>
-              </Card>
-
-              {pendingRewards?.marketSharePercent && (
-                <Card className="border-blue-500">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Your Market Share
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold text-blue-600">
-                      {pendingRewards.marketSharePercent.toFixed(1)}%
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      ~{formatUSD(positions.summary.totalDailyReward * (pendingRewards.marketSharePercent / 100))}/day realistic
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold">Active Positions</h2>
-              {positions.positions.length === 0 ? (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground">No active positions found</p>
-                  </CardContent>
-                </Card>
               ) : (
-                positions.positions.map((position: any) => (
-                  <Card key={position.id}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg">
-                            {position.market.question}
-                          </CardTitle>
-                          <CardDescription className="mt-2">
-                            {position.orderCount} active orders
-                          </CardDescription>
-                        </div>
-                        {position.market.active ? (
-                          <Badge className="bg-green-500">Active</Badge>
-                        ) : (
-                          <Badge variant="secondary">Inactive</Badge>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Q-Score</p>
-                          <p className="text-lg font-bold">{position.qMin.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Max Daily</p>
-                          <p className="text-lg font-bold text-orange-600">
-                            {formatUSD(position.estimatedDaily)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">100% share</p>
-                        </div>
-                        {pendingRewards?.marketSharePercent && (
-                          <div>
-                            <p className="text-xs text-muted-foreground">Realistic Daily</p>
-                            <p className="text-lg font-bold text-blue-600">
-                              {formatUSD(position.estimatedDaily * (pendingRewards.marketSharePercent / 100))}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{pendingRewards.marketSharePercent.toFixed(0)}% share</p>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-xs text-muted-foreground">Capital</p>
-                          <p className="text-lg font-bold">
-                            {formatUSD(position.capitalDeployed)}
-                          </p>
-                        </div>
-                        <div>
-                          <Link
-                            href={`/markets/${position.marketId}`}
-                            className="text-sm text-primary hover:underline flex items-center gap-1"
-                          >
-                            View Market
-                            <ExternalLink className="h-3 w-3" />
-                          </Link>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                <div className="text-center py-8 space-y-4">
+                  <DollarSign className="h-12 w-12 mx-auto text-muted-foreground" />
+                  <div>
+                    <p className="font-medium mb-1">No rewards found</p>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      No market maker rewards found for this wallet address
+                    </p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4 text-left max-w-md mx-auto">
+                      <p className="text-sm font-medium text-blue-900 mb-2">
+                        💡 Connected with the wrong wallet?
+                      </p>
+                      <p className="text-xs text-blue-700 mb-2">
+                        Make sure you're connected with the wallet you use for trading on Polymarket.
+                      </p>
+                      <p className="text-xs text-blue-600 font-mono">
+                        Current: {address?.slice(0, 10)}...{address?.slice(-8)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button asChild variant="outline">
+                    <a
+                      href="https://polymarket.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Go to Polymarket
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
               )}
-            </div>
-          </>
-        ) : (
-          <Card>
-            <CardContent className="py-12 text-center space-y-4">
-              <p className="text-lg font-semibold">No Positions Calculated Yet</p>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                To see your positions here, visit market pages from the Markets tab and calculate your Q-scores.
-                Your positions will automatically appear in your portfolio.
-              </p>
-              <Link href="/markets">
-                <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
-                  Browse Markets
-                </button>
-              </Link>
             </CardContent>
           </Card>
-        )}
-      </main>
 
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>
+                Explore markets and optimize your strategy
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Link href="/discover" className="block">
+                  <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+                    <CardHeader>
+                      <TrendingUp className="h-8 w-8 mb-2" />
+                      <CardTitle className="text-lg">Discover Markets</CardTitle>
+                      <CardDescription>
+                        Find the best opportunities for your capital
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </Link>
+                <Link href="/optimize" className="block">
+                  <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+                    <CardHeader>
+                      <DollarSign className="h-8 w-8 mb-2" />
+                      <CardTitle className="text-lg">Optimize Strategy</CardTitle>
+                      <CardDescription>
+                        Get recommendations to maximize rewards
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
       <Footer />
     </div>
   )

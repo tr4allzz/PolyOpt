@@ -27,7 +27,6 @@ let lastFileModTime: number = 0
 export function readLeaderboardCache(): LeaderboardCache | null {
   try {
     if (!fs.existsSync(CACHE_FILE_PATH)) {
-      console.log('⚠️  No leaderboard cache found')
       return null
     }
 
@@ -41,15 +40,12 @@ export function readLeaderboardCache(): LeaderboardCache | null {
     }
 
     // File changed or first load, read from disk
-    console.log('📖 Loading leaderboard cache from disk...')
     const fileContent = fs.readFileSync(CACHE_FILE_PATH, 'utf-8')
     memoryCache = JSON.parse(fileContent)
     lastFileModTime = currentModTime
 
-    console.log(`✓ Cached ${memoryCache.total} entries in memory`)
     return memoryCache
   } catch (error) {
-    console.error('❌ Error reading leaderboard cache:', error)
     return null
   }
 }

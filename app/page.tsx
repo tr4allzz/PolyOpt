@@ -21,14 +21,14 @@ export default function Home() {
               Calculate exact Q-scores, analyze competition, and optimize your liquidity provision strategy with opt.markets
             </p>
             <div className="flex gap-4 justify-center">
-              <Link href="/markets">
+              <Link href="/discover">
                 <Button size="lg">
-                  Browse Markets
+                  Discover Opportunities
                 </Button>
               </Link>
-              <Link href="/optimize">
+              <Link href="/markets">
                 <Button size="lg" variant="outline">
-                  Optimize Strategy
+                  Browse Markets
                 </Button>
               </Link>
             </div>
@@ -69,11 +69,11 @@ export default function Home() {
               <Card>
                 <CardHeader>
                   <Target className="h-10 w-10 mb-2 text-primary" />
-                  <CardTitle>Order Optimizer</CardTitle>
+                  <CardTitle>Market Discovery</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <CardDescription>
-                    Find the optimal order placement to maximize your rewards
+                    Find the best opportunities and optimize order placement to maximize rewards
                   </CardDescription>
                 </CardContent>
               </Card>
@@ -129,9 +129,9 @@ export default function Home() {
                   3
                 </div>
                 <div>
-                  <h3 className="font-bold mb-2">Optimize Your Strategy</h3>
+                  <h3 className="font-bold mb-2">Discover Best Markets</h3>
                   <p className="text-muted-foreground">
-                    Use our optimizer to find the best order placement for your capital
+                    Use our discovery tool to find opportunities and optimize order placement
                   </p>
                 </div>
               </div>
@@ -160,7 +160,7 @@ export default function Home() {
             <p className="text-muted-foreground mb-8">
               Start analyzing markets and maximizing your Polymarket LP rewards today
             </p>
-            <Link href="/markets">
+            <Link href="/discover">
               <Button size="lg">
                 Get Started
               </Button>

@@ -14,30 +14,33 @@ export async function GET(request: Request) {
     const offset = parseInt(searchParams.get('offset') || '0');
     const activeOnly = searchParams.get('active') !== 'false';
 
-    // Fetch from database
-    const markets = await prisma.market.findMany({
-      where: activeOnly ? { active: true } : undefined,
-      orderBy: { rewardPool: 'desc' },
-      take: limit,
-      skip: offset,
-      select: {
-        id: true,
-        question: true,
-        maxSpread: true,
-        minSize: true,
-        rewardPool: true,
-        midpoint: true,
-        volume: true,
-        liquidity: true,
-        endDate: true,
-        active: true,
-        updatedAt: true,
-      },
-    });
+    // Fetch markets and count in parallel for better performance
+    const whereClause = activeOnly ? { active: true } : undefined;
 
-    const total = await prisma.market.count({
-      where: activeOnly ? { active: true } : undefined,
-    });
+    const [markets, total] = await Promise.all([
+      prisma.market.findMany({
+        where: whereClause,
+        orderBy: { rewardPool: 'desc' },
+        take: limit,
+        skip: offset,
+        select: {
+          id: true,
+          question: true,
+          maxSpread: true,
+          minSize: true,
+          rewardPool: true,
+          midpoint: true,
+          volume: true,
+          liquidity: true,
+          endDate: true,
+          active: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.market.count({
+        where: whereClause,
+      }),
+    ]);
 
     return NextResponse.json({
       markets,

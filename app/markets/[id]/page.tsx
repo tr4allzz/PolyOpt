@@ -9,6 +9,11 @@ import { OrderInput } from '@/components/calculator/order-input'
 import { QScoreDisplay } from '@/components/calculator/qscore-display'
 import { OptimizerModal } from '@/components/optimizer/optimizer-modal'
 import { OrderSuggestions } from '@/components/market/order-suggestions'
+import { RealtimeOrderBook } from '@/components/market/realtime-order-book'
+import { WhaleAlert } from '@/components/market/whale-alert'
+import { LiveTradeFeed } from '@/components/market/live-trade-feed'
+import { MarketCommentary } from '@/components/social/market-commentary'
+import { WebSocketStatus } from '@/components/market/websocket-status'
 import { formatUSD, formatPrice, formatNumber } from '@/lib/polymarket/utils'
 import { format } from 'date-fns'
 
@@ -93,11 +98,14 @@ export default function MarketDetailPage({ params }: { params: { id: string } })
                 <p className="text-muted-foreground">{market.description}</p>
               )}
             </div>
-            {market.active ? (
-              <Badge className="bg-green-500">Active</Badge>
-            ) : (
-              <Badge variant="secondary">Inactive</Badge>
-            )}
+            <div className="flex gap-2">
+              <WebSocketStatus />
+              {market.active ? (
+                <Badge className="bg-green-500">Active</Badge>
+              ) : (
+                <Badge variant="secondary">Inactive</Badge>
+              )}
+            </div>
           </div>
 
           <Card>
@@ -183,6 +191,33 @@ export default function MarketDetailPage({ params }: { params: { id: string } })
         {/* Order Placement Suggestions */}
         <div className="mb-8">
           <OrderSuggestions marketId={market.id} />
+        </div>
+
+        {/* Real-Time Features */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">📊 Real-Time Market Data</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Order Book */}
+            <RealtimeOrderBook
+              marketId={market.conditionId || market.id}
+              assetId={market.yesTokenId || market.id}
+              midpoint={market.midpoint}
+            />
+
+            {/* Whale Alerts */}
+            <WhaleAlert marketId={market.conditionId || market.id} threshold={5000} />
+          </div>
+        </div>
+
+        {/* Trade Feed & Commentary */}
+        <div className="mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Live Trades */}
+            <LiveTradeFeed marketId={market.conditionId || market.id} limit={15} />
+
+            {/* Market Commentary */}
+            <MarketCommentary marketId={market.conditionId || market.id} />
+          </div>
         </div>
       </main>
 

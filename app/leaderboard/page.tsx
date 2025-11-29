@@ -18,10 +18,19 @@ interface LeaderboardEntry {
 }
 
 interface LeaderboardData {
-  leaderboard: LeaderboardEntry[]
-  total: number
-  limit: number
-  offset: number
+  entries: LeaderboardEntry[]
+  summary: {
+    totalLPs: number
+    totalEarnings: number
+    averageReward: number
+    lastUpdated: string | null
+  }
+  pagination: {
+    limit: number
+    offset: number
+    total: number
+    hasMore: boolean
+  }
 }
 
 const ITEMS_PER_PAGE = 20
@@ -34,7 +43,11 @@ export default function LeaderboardPage() {
   const [filters, setFilters] = useState<FilterValues>({
     search: '',
     minRewards: '',
+    maxRewards: '',
     minPayouts: '',
+    rankRange: '',
+    sortBy: '',
+    sortOrder: '',
   })
 
   useEffect(() => {
@@ -50,7 +63,11 @@ export default function LeaderboardPage() {
         // Add filter parameters if they exist
         if (filters.search) params.append('search', filters.search)
         if (filters.minRewards) params.append('minRewards', filters.minRewards)
+        if (filters.maxRewards) params.append('maxRewards', filters.maxRewards)
         if (filters.minPayouts) params.append('minPayouts', filters.minPayouts)
+        if (filters.rankRange) params.append('rankRange', filters.rankRange)
+        if (filters.sortBy) params.append('sortBy', filters.sortBy)
+        if (filters.sortOrder) params.append('sortOrder', filters.sortOrder)
 
         const response = await fetch(`/api/leaderboard?${params.toString()}`)
         if (!response.ok) {
@@ -77,28 +94,24 @@ export default function LeaderboardPage() {
     setFilters({
       search: '',
       minRewards: '',
+      maxRewards: '',
       minPayouts: '',
+      rankRange: '',
+      sortBy: '',
+      sortOrder: '',
     })
     setCurrentPage(1)
   }, [])
 
   // Memoize stats calculation - calculate only once when data changes
   const stats = useMemo(() => {
-    if (!data) return null
-
-    // Calculate sum once and reuse
-    const totalRewardsOnPage = data.leaderboard.reduce(
-      (sum, entry) => sum + entry.totalRewards,
-      0
-    )
+    if (!data || !data.entries) return null
 
     return {
-      totalTraders: data.total,
-      totalRewards: totalRewardsOnPage,
-      avgReward: data.leaderboard.length > 0
-        ? totalRewardsOnPage / data.leaderboard.length
-        : 0,
-      topTraderRewards: data.leaderboard[0]?.totalRewards || 0,
+      totalTraders: data.summary.totalLPs,
+      totalRewards: data.summary.totalEarnings,
+      avgReward: data.summary.averageReward,
+      topTraderRewards: data.entries[0]?.totalRewards || 0,
     }
   }, [data])
 
@@ -204,17 +217,17 @@ export default function LeaderboardPage() {
               <div className="text-center py-12">
                 <p className="text-destructive">{error}</p>
               </div>
-            ) : data && data.leaderboard.length > 0 ? (
+            ) : data && data.entries && data.entries.length > 0 ? (
               <>
-                <LeaderboardTable entries={data.leaderboard} />
+                <LeaderboardTable entries={data.entries} />
                 <div className="mt-6 pt-4 border-t">
                   <Pagination
                     currentPage={currentPage}
-                    totalPages={Math.ceil(data.total / ITEMS_PER_PAGE)}
+                    totalPages={Math.ceil(data.pagination.total / ITEMS_PER_PAGE)}
                     onPageChange={setCurrentPage}
                   />
                   <p className="text-center text-sm text-muted-foreground mt-3">
-                    Showing {data.offset + 1}-{Math.min(data.offset + data.limit, data.total)} of {data.total} traders
+                    Showing {data.pagination.offset + 1}-{Math.min(data.pagination.offset + data.pagination.limit, data.pagination.total)} of {data.pagination.total} traders
                   </p>
                 </div>
               </>

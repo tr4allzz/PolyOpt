@@ -9,11 +9,16 @@ import {
 } from '@/types/api';
 import { RewardMarketData, UserOrderData } from './types';
 import { Order } from '@/types/rewards';
+import { LRUCache } from '@/lib/cache/lru-cache';
+import { fetchWithTimeout, fetchWithRetry } from '@/lib/utils/fetch-with-timeout';
+
+// Default timeout for API requests (10 seconds)
+const DEFAULT_TIMEOUT = 10000;
 
 /**
- * Cache for API responses
+ * LRU Cache for API responses (max 500 entries to prevent memory leaks)
  */
-const cache = new Map<string, { data: any; expiresAt: number }>();
+const cache = new LRUCache(500);
 
 /**
  * Estimate daily reward pool based on market parameters
@@ -44,19 +49,11 @@ function estimateRewardPool(
 }
 
 function getCached<T>(key: string): T | null {
-  const cached = cache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data as T;
-  }
-  cache.delete(key);
-  return null;
+  return cache.get(key) as T | null;
 }
 
 function setCache<T>(key: string, data: T, ttlSeconds: number): void {
-  cache.set(key, {
-    data,
-    expiresAt: Date.now() + ttlSeconds * 1000,
-  });
+  cache.set(key, data, ttlSeconds);
 }
 
 /**
@@ -71,7 +68,10 @@ export async function fetchRewardMarkets(): Promise<RewardMarketData[]> {
     // Fetch ONLY from CLOB API - these have ACTUAL active liquidity rewards
     console.log('💰 Fetching markets with ACTUAL active rewards from CLOB API...');
 
-    const clobResponse = await fetch(`${API_ENDPOINTS.CLOB_API}/sampling-simplified-markets`);
+    const clobResponse = await fetchWithTimeout(
+      `${API_ENDPOINTS.CLOB_API}/sampling-simplified-markets`,
+      { timeout: DEFAULT_TIMEOUT }
+    );
     if (!clobResponse.ok) {
       throw new Error(`CLOB API error: ${clobResponse.status}`);
     }
@@ -83,7 +83,10 @@ export async function fetchRewardMarkets(): Promise<RewardMarketData[]> {
 
     // Fetch Gamma API for market details
     console.log('📦 Fetching market details from Gamma API...');
-    const gammaResponse = await fetch(`${API_ENDPOINTS.POLYMARKET_API}/markets?closed=false&active=true&limit=1000`);
+    const gammaResponse = await fetchWithTimeout(
+      `${API_ENDPOINTS.POLYMARKET_API}/markets?closed=false&active=true&limit=1000`,
+      { timeout: DEFAULT_TIMEOUT }
+    );
     if (!gammaResponse.ok) {
       throw new Error(`Gamma API error: ${gammaResponse.status}`);
     }
@@ -164,8 +167,11 @@ export async function fetchMarketDetails(
   if (cached) return cached;
 
   try {
-    // Fetch from Polymarket Gamma API
-    const response = await fetch(`${API_ENDPOINTS.POLYMARKET_API}/markets/${marketId}`);
+    // Fetch from Polymarket Gamma API with timeout
+    const response = await fetchWithTimeout(
+      `${API_ENDPOINTS.POLYMARKET_API}/markets/${marketId}`,
+      { timeout: DEFAULT_TIMEOUT }
+    );
 
     if (!response.ok) {
       throw new Error(`Polymarket API error: ${response.status}`);
@@ -230,8 +236,11 @@ export async function fetchOrderBook(
   if (cached) return cached;
 
   try {
-    // Fetch from Polymarket CLOB API
-    const response = await fetch(`${API_ENDPOINTS.CLOB_API}/book?token_id=${assetId}`);
+    // Fetch from Polymarket CLOB API with timeout
+    const response = await fetchWithTimeout(
+      `${API_ENDPOINTS.CLOB_API}/book?token_id=${assetId}`,
+      { timeout: DEFAULT_TIMEOUT }
+    );
 
     if (!response.ok) {
       throw new Error(`CLOB API error: ${response.status}`);
@@ -261,7 +270,7 @@ export async function fetchUserActivity(
   if (cached) return cached;
 
   try {
-    // Fetch from Polymarket Data API (public, no auth required)
+    // Fetch from Polymarket Data API (public, no auth required) with timeout
     const url = new URL(`${API_ENDPOINTS.DATA_API}/activity`);
     url.searchParams.append('user', walletAddress);
     if (marketId) {
@@ -270,7 +279,7 @@ export async function fetchUserActivity(
     url.searchParams.append('type', 'TRADE');
     url.searchParams.append('limit', '500');
 
-    const response = await fetch(url.toString());
+    const response = await fetchWithTimeout(url.toString(), { timeout: DEFAULT_TIMEOUT });
 
     if (!response.ok) {
       throw new Error(`Data API error: ${response.status}`);
@@ -294,13 +303,13 @@ export async function checkUserHoldings(
   marketConditionId: string
 ): Promise<any | null> {
   try {
-    // Fetch top holders for this market
+    // Fetch top holders for this market with timeout
     const url = new URL(`${API_ENDPOINTS.DATA_API}/holders`);
     url.searchParams.append('market', marketConditionId);
     url.searchParams.append('limit', '500');
     url.searchParams.append('minBalance', '1');
 
-    const response = await fetch(url.toString());
+    const response = await fetchWithTimeout(url.toString(), { timeout: DEFAULT_TIMEOUT });
 
     if (!response.ok) {
       console.warn(`Holders API error for market ${marketConditionId}: ${response.status}`);

@@ -24,9 +24,6 @@ export async function fetchRewardAllocations(): Promise<Map<string, RewardData>>
     }
 
     const data = await response.json();
-
-    console.log(`📦 Received ${data.data.length} markets from CLOB sampling API`);
-
     const rewardMap = new Map<string, RewardData>();
 
     data.data.forEach((market: any) => {
@@ -54,11 +51,8 @@ export async function fetchRewardAllocations(): Promise<Map<string, RewardData>>
       }
     });
 
-    console.log(`✅ Found ${rewardMap.size} markets with reward allocations`);
-
     return rewardMap;
   } catch (error) {
-    console.error('Error fetching reward allocations:', error);
     return new Map();
   }
 }
