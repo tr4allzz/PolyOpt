@@ -16,6 +16,15 @@ interface CLOBResponse {
   data: SamplingMarket[];
 }
 
+interface GammaMarket {
+  id: string;
+  conditionId: string;
+  volumeClob?: number;
+  liquidityClob?: number;
+  volume?: string;
+  liquidity?: string;
+}
+
 async function syncMarkets() {
   console.log('🔄 Syncing reward markets from Polymarket CLOB API...\n');
 
@@ -37,12 +46,19 @@ async function syncMarkets() {
     );
     console.log(`✅ Active markets with rewards: ${marketsWithRewards.length}\n`);
 
+    // Step 2: Fetch volume/liquidity from Gamma API
+    console.log('Fetching volume/liquidity from Gamma API...');
+    const gammaResponse = await fetch('https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=1000');
+    const gammaMarkets: GammaMarket[] = await gammaResponse.json();
+    const gammaMap = new Map(gammaMarkets.map(m => [m.conditionId, m]));
+    console.log(`📊 Received ${gammaMarkets.length} markets from Gamma API\n`);
+
     let created = 0;
     let updated = 0;
     let skipped = 0;
     let failed = 0;
 
-    // Step 2: Fetch full details for each market
+    // Step 3: Fetch full details for each market
     for (const rewardMarket of marketsWithRewards) {
       try {
         // Fetch full market details from CLOB API
@@ -75,6 +91,11 @@ async function syncMarkets() {
           continue;
         }
 
+        // Get volume/liquidity from Gamma API
+        const gammaMarket = gammaMap.get(rewardMarket.condition_id);
+        const volume = gammaMarket ? (gammaMarket.volumeClob || parseFloat(gammaMarket.volume || '0')) : 0;
+        const liquidity = gammaMarket ? (gammaMarket.liquidityClob || parseFloat(gammaMarket.liquidity || '0')) : 0;
+
         const marketData = {
           question: marketDetails.question,
           description: marketDetails.description || '',
@@ -83,8 +104,8 @@ async function syncMarkets() {
           minSize: parseFloat(marketDetails.rewards?.min_size || '100'),
           rewardPool: dailyRewardPool,
           midpoint: 0.5, // Default, will be updated from orderbook if needed
-          volume: 0, // Not provided by CLOB API
-          liquidity: 0, // Not provided by CLOB API
+          volume,
+          liquidity,
           endDate: marketDetails.end_date_iso ? new Date(marketDetails.end_date_iso) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           active: marketDetails.active !== false,
           resolved: marketDetails.closed || false,

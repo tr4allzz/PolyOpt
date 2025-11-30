@@ -11,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatUSD } from '@/lib/polymarket/utils'
-import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart } from 'lucide-react'
+import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart, ArrowRight } from 'lucide-react'
+import { ConnectButton } from '@/components/wallet/connect-button'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -180,12 +181,34 @@ export default function PortfolioPage() {
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-1 container py-16">
-          <div className="max-w-2xl mx-auto text-center space-y-6">
-            <Wallet className="h-20 w-20 mx-auto text-muted-foreground" />
-            <h1 className="text-4xl font-bold">Connect Your Wallet</h1>
-            <p className="text-lg text-muted-foreground">
-              See your Polymarket earnings and positions instantly
-            </p>
+          <div className="max-w-2xl mx-auto text-center space-y-8">
+            <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <Wallet className="h-10 w-10 text-primary" />
+            </div>
+            <div className="space-y-3">
+              <h1 className="text-4xl font-bold">Connect Your Wallet</h1>
+              <p className="text-lg text-muted-foreground">
+                See your Polymarket earnings and positions instantly
+              </p>
+            </div>
+            <ConnectButton />
+            <div className="pt-4 space-y-4">
+              <p className="text-sm text-muted-foreground">What you'll see:</p>
+              <div className="grid gap-3 text-left max-w-sm mx-auto">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <DollarSign className="h-5 w-5 text-green-500" />
+                  <span className="text-sm">Total rewards earned</span>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <ListOrdered className="h-5 w-5 text-blue-500" />
+                  <span className="text-sm">Open orders earning rewards</span>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <PieChart className="h-5 w-5 text-purple-500" />
+                  <span className="text-sm">Active positions & PnL</span>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
         <Footer />
@@ -229,7 +252,10 @@ export default function PortfolioPage() {
                 <ListOrdered className="h-4 w-4" />
                 <span className="hidden sm:inline">Orders</span>
                 {!hasCredentials && (
-                  <span className="ml-1 h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="relative ml-1 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                  </span>
                 )}
               </TabsTrigger>
               <TabsTrigger value="positions" className="flex items-center gap-2">

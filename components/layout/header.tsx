@@ -3,11 +3,14 @@
 import { ConnectButton } from '@/components/wallet/connect-button'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Menu, X as MenuClose } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { Menu, X as MenuClose, BookOpen, Info } from 'lucide-react'
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const pathname = usePathname()
 
   const navLinks = [
     { href: '/markets', label: 'Markets' },
@@ -15,6 +18,16 @@ export function Header() {
     { href: '/portfolio', label: 'Portfolio' },
     { href: '/leaderboard', label: 'Leaderboard' },
   ]
+
+  const secondaryLinks = [
+    { href: '/docs', label: 'Docs' },
+    { href: '/about', label: 'About' },
+  ]
+
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/'
+    return pathname.startsWith(href)
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -30,7 +43,27 @@ export function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className={cn(
+                "text-sm font-medium transition-colors",
+                isActive(link.href)
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {link.label}
+            </Link>
+          ))}
+          <span className="w-px h-4 bg-border" />
+          {secondaryLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={cn(
+                "text-sm font-medium transition-colors",
+                isActive(link.href)
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
             >
               {link.label}
             </Link>
@@ -67,13 +100,34 @@ export function Header() {
       {/* Mobile Navigation */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t bg-background">
-          <nav className="container py-4 flex flex-col gap-4">
+          <nav className="container py-4 flex flex-col gap-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
+                className={cn(
+                  "text-sm font-medium transition-colors py-2 px-3 rounded-md",
+                  isActive(link.href)
+                    ? "text-foreground bg-muted"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="my-2 border-t" />
+            {secondaryLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={cn(
+                  "text-sm font-medium transition-colors py-2 px-3 rounded-md",
+                  isActive(link.href)
+                    ? "text-foreground bg-muted"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
               >
                 {link.label}
               </Link>

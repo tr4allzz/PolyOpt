@@ -125,8 +125,9 @@ export async function fetchRewardMarkets(): Promise<RewardMarketData[]> {
           console.warn(`Could not parse price for ${m.question}`, e);
         }
 
-        const volume = parseFloat(m.volume || '0');
-        const liquidity = parseFloat(m.liquidity || '0');
+        // Gamma API returns volumeClob/liquidityClob for CLOB trading
+        const volume = parseFloat(m.volumeClob || m.volume || '0');
+        const liquidity = parseFloat(m.liquidityClob || m.liquidity || '0');
 
         return {
           id: m.id, // Use Gamma API id
@@ -196,8 +197,9 @@ export async function fetchMarketDetails(
       console.warn(`Could not parse price for ${data.question}`, e);
     }
 
-    const volume = parseFloat(data.volume || '0');
-    const liquidity = parseFloat(data.liquidity || '0');
+    // Gamma API returns volumeClob/liquidityClob for CLOB trading
+    const volume = parseFloat((data as any).volumeClob || data.volume || '0');
+    const liquidity = parseFloat((data as any).liquidityClob || data.liquidity || '0');
     const maxSpread = data.rewardsMaxSpread;
     const minSize = data.rewardsMinSize;
 
@@ -386,8 +388,8 @@ export function transformMarketData(
     description: market.description || '',
     endDate: new Date((market as any).end_date_iso || (market as any).endDateIso || Date.now()),
     midpoint,
-    volume: parseFloat((market as any).volume || '0'),
-    liquidity: parseFloat((market as any).liquidity || '0'),
+    volume: parseFloat((market as any).volumeClob || (market as any).volume || '0'),
+    liquidity: parseFloat((market as any).liquidityClob || (market as any).liquidity || '0'),
     active: (market as any).active && !(market as any).closed,
     resolved: (market as any).closed || false,
     maxSpread: rewardConfig
