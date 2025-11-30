@@ -42,7 +42,7 @@ export const GET = requireAuth(async (request: NextRequest, auth) => {
   const hasCredentials = !!(dbUser?.apiKey);
 
   // Fetch open orders if user has credentials
-  let openOrders = { orders: [], summary: { totalOrders: 0 } };
+  let openOrders: { orders: any[]; summary: { totalOrders: number } } = { orders: [], summary: { totalOrders: 0 } };
   if (hasCredentials && dbUser) {
     try {
       openOrders = await fetchOpenOrders(walletAddress, dbUser);
