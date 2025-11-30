@@ -116,11 +116,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Store credentials in database (create or update user)
+    // Lowercase wallet address for consistency with auth middleware
+    const normalizedAddress = address.toLowerCase();
+
     // TODO: Encrypt credentials before storing in production
     await prisma.user.upsert({
-      where: { walletAddress: address },
+      where: { walletAddress: normalizedAddress },
       create: {
-        walletAddress: address,
+        walletAddress: normalizedAddress,
         apiKey: credentials.apiKey,
         apiSecret: credentials.secret,
         apiPassphrase: credentials.passphrase,

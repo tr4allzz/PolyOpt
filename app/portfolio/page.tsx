@@ -1,27 +1,33 @@
 'use client'
 
 import { useState } from 'react'
-import { useAccount, useSignMessage, useSignTypedData } from 'wagmi'
+import { useAccount, useSignMessage, useSignTypedData, useSwitchChain, useChainId } from 'wagmi'
+import { polygon } from 'wagmi/chains'
+import { useQueryClient } from '@tanstack/react-query'
 import { usePortfolioData } from '@/hooks/usePortfolioData'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatUSD } from '@/lib/polymarket/utils'
-import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react'
+import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount()
+  const queryClient = useQueryClient()
   const { data, isLoading, error, refetch } = usePortfolioData()
   const [isAutoSetting, setIsAutoSetting] = useState(false)
   const [autoSetupError, setAutoSetupError] = useState<string | null>(null)
 
-  // Wagmi hooks for signing
+  // Wagmi hooks for signing and chain switching
   const { signMessageAsync } = useSignMessage()
   const { signTypedDataAsync } = useSignTypedData()
+  const { switchChainAsync } = useSwitchChain()
+  const chainId = useChainId()
 
   const rewards = data?.rewards || null
   const activePositions = data?.activePositions || null
@@ -47,7 +53,13 @@ export default function PortfolioPage() {
       })
 
 
-      // Step 2: Sign EIP-712 message for Polymarket
+      // Step 2: Ensure we're on Polygon network before signing EIP-712 message
+      if (chainId !== polygon.id) {
+        toast.info('Switching to Polygon network...', { description: 'Please approve the network switch in your wallet' })
+        await switchChainAsync({ chainId: polygon.id })
+      }
+
+      // Step 3: Sign EIP-712 message for Polymarket
       // According to Polymarket docs, nonce defaults to 0 for API key creation
       const timestamp = Math.floor(Date.now() / 1000)
       const nonce = 0 // Default nonce for creating new API credentials
@@ -55,7 +67,7 @@ export default function PortfolioPage() {
       const domain = {
         name: 'ClobAuthDomain',
         version: '1',
-        chainId: 137, // Polygon
+        chainId: polygon.id, // Polygon (137)
       } as const
 
       const types = {
@@ -82,18 +94,16 @@ export default function PortfolioPage() {
       })
 
 
-      // Step 4: Call auto-setup endpoint with Polymarket signature and nonce
-      const response = await fetch('/api/user/auto-setup-api', {
+      // Step 4: Call generate-credentials endpoint with Polymarket signature
+      const response = await fetch('/api/user/generate-credentials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Wallet-Address': address,
-          'X-Signature': authSignature,
-          'X-Timestamp': authTimestamp.toString(),
         },
         body: JSON.stringify({
+          address: address,
           signature: polySignature,
-          timestamp,
+          timestamp: timestamp.toString(),
           nonce,
         }),
       })
@@ -102,8 +112,8 @@ export default function PortfolioPage() {
 
       if (response.ok && result.success) {
         toast.success('API credentials configured!', { description: 'Your open orders are now being tracked' })
-        // Refresh data
-        await refetch?.()
+        // Invalidate cache and force refetch
+        await queryClient.invalidateQueries({ queryKey: ['portfolio-data'] })
         setAutoSetupError(null)
       } else {
         // Auto-setup failed, show manual setup option
@@ -208,550 +218,546 @@ export default function PortfolioPage() {
             </Button>
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Earned
-                </CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatUSD(rewards?.summary?.totalEarned || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {rewards?.summary?.totalRewards || 0} total reward{rewards?.summary?.totalRewards !== 1 ? 's' : ''}
-                </p>
-              </CardContent>
-            </Card>
+          {/* Tabs */}
+          <Tabs defaultValue="overview" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="hidden sm:inline">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="orders" className="flex items-center gap-2">
+                <ListOrdered className="h-4 w-4" />
+                <span className="hidden sm:inline">Orders</span>
+                {!hasCredentials && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-blue-500" />
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="positions" className="flex items-center gap-2">
+                <PieChart className="h-4 w-4" />
+                <span className="hidden sm:inline">Positions</span>
+              </TabsTrigger>
+            </TabsList>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Open Orders
-                </CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {openOrders?.summary?.totalOrders || 0}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {openOrders?.summary?.totalOrders ? 'Earning rewards' : hasCredentials ? 'No open orders' : 'API setup required'}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Last Reward
-                </CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                {rewards?.rewards?.[0] ? (
-                  <>
-                    <div className="text-2xl font-bold text-green-600">
-                      +{formatUSD(parseFloat(rewards.rewards[0].usdcSize || rewards.rewards[0].cash_amount || 0))}
+            {/* Overview Tab */}
+            <TabsContent value="overview" className="space-y-6">
+              {/* Summary Cards */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Total Earned
+                    </CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {formatUSD(rewards?.summary?.totalEarned || 0)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(rewards.rewards[0].timestamp * 1000), 'MMM d, yyyy')}
+                      {rewards?.summary?.totalRewards || 0} total reward{rewards?.summary?.totalRewards !== 1 ? 's' : ''}
                     </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-2xl font-bold text-muted-foreground">$0.00</div>
-                    <p className="text-xs text-muted-foreground mt-1">No rewards yet</p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  </CardContent>
+                </Card>
 
-          {/* Open Orders (Earning Rewards) - Requires API Credentials */}
-          {!hasCredentials ? (
-            <Card className="border-blue-500 border-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-blue-500" />
-                  Open Orders (Earning Rewards)
-                </CardTitle>
-                <CardDescription>Your limit orders on the book that earn maker rewards</CardDescription>
-              </CardHeader>
-              <CardContent className="text-center py-8">
-                <AlertCircle className="h-12 w-12 mx-auto text-blue-500 mb-4" />
-                <p className="font-medium mb-2">Setup Required to View Open Orders</p>
-                <p className="text-sm text-muted-foreground mb-6">
-                  To see your limit orders (the ones earning maker rewards), we need to connect to Polymarket's API.
-                </p>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Open Orders
+                    </CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {openOrders?.summary?.totalOrders || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {openOrders?.summary?.totalOrders ? 'Earning rewards' : hasCredentials ? 'No open orders' : 'API setup required'}
+                    </p>
+                  </CardContent>
+                </Card>
 
-                <div className="space-y-4">
-                  {!autoSetupError ? (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-left">
-                      <p className="text-sm font-semibold text-blue-900 mb-2">✨ Quick Setup (Recommended)</p>
-                      <p className="text-xs text-blue-800 mb-3">
-                        We can automatically derive your API credentials from your wallet signature. This takes 30 seconds and requires just one signature.
-                      </p>
-                      <Button
-                        onClick={handleAutoSetup}
-                        disabled={isAutoSetting}
-                        className="w-full"
-                      >
-                        {isAutoSetting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Setting up...
-                          </>
-                        ) : (
-                          'Auto-Setup API Access'
-                        )}
-                      </Button>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Last Reward
+                    </CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    {rewards?.rewards?.[0] ? (
+                      <>
+                        <div className="text-2xl font-bold text-green-600">
+                          +{formatUSD(parseFloat(rewards.rewards[0].usdcSize || rewards.rewards[0].cash_amount || 0))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(rewards.rewards[0].timestamp * 1000), 'MMM d, yyyy')}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold text-muted-foreground">$0.00</div>
+                        <p className="text-xs text-muted-foreground mt-1">No rewards yet</p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Recent Rewards */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Recent Rewards</CardTitle>
+                      <CardDescription>Your latest earnings</CardDescription>
+                    </div>
+                    {rewards?.rewards?.length > 5 && (
+                      <Link href="/history">
+                        <Button variant="ghost" size="sm">
+                          View All
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {rewards?.rewards?.length > 0 ? (
+                    <div className="space-y-3">
+                      {rewards.rewards.slice(0, 5).map((reward: any, i: number) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between py-3 border-b last:border-0"
+                        >
+                          <div className="space-y-1">
+                            <p className="font-medium text-sm">
+                              {reward.description || 'Market Maker Reward'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(reward.timestamp * 1000), 'MMM d, yyyy')}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600">
+                              +{formatUSD(parseFloat(reward.usdcSize || reward.cash_amount || 0))}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-left">
-                      <p className="text-sm font-semibold text-amber-900 mb-2">⚠️ Auto-Setup Failed</p>
-                      <p className="text-xs text-amber-800 mb-3">
-                        {autoSetupError}
-                      </p>
-                      <Button
-                        onClick={() => setAutoSetupError(null)}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Try Again
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">
-                        Or use manual setup
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-left">
-                    <p className="text-sm font-semibold text-gray-900 mb-2">🔧 Manual Setup</p>
-                    <p className="text-xs text-gray-700 mb-3">
-                      Create API credentials on Polymarket and enter them manually.
-                    </p>
-                    <div className="flex gap-3">
-                      <Button asChild variant="outline" size="sm">
+                    <div className="text-center py-8 space-y-4">
+                      <DollarSign className="h-12 w-12 mx-auto text-muted-foreground" />
+                      <div>
+                        <p className="font-medium mb-1">No rewards found</p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          No market maker rewards found for this wallet address
+                        </p>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4 text-left max-w-md mx-auto">
+                          <p className="text-sm font-medium text-blue-900 mb-2">
+                            Connected with the wrong wallet?
+                          </p>
+                          <p className="text-xs text-blue-700 mb-2">
+                            Make sure you're connected with the wallet you use for trading on Polymarket.
+                          </p>
+                          <p className="text-xs text-blue-600 font-mono">
+                            Current: {address?.slice(0, 10)}...{address?.slice(-8)}
+                          </p>
+                        </div>
+                      </div>
+                      <Button asChild variant="outline">
                         <a
-                          href="https://polymarket.com/settings/api"
+                          href="https://polymarket.com"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          Get API Keys
-                          <ExternalLink className="ml-2 h-3 w-3" />
+                          Go to Polymarket
+                          <ExternalLink className="ml-2 h-4 w-4" />
                         </a>
                       </Button>
-                      <Link href="/settings">
-                        <Button size="sm">Enter in Settings</Button>
-                      </Link>
                     </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                  <CardDescription>
+                    Explore markets and optimize your strategy
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Link href="/discover" className="block">
+                      <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+                        <CardHeader>
+                          <TrendingUp className="h-8 w-8 mb-2" />
+                          <CardTitle className="text-lg">Discover Markets</CardTitle>
+                          <CardDescription>
+                            Find the best opportunities for your capital
+                          </CardDescription>
+                        </CardHeader>
+                      </Card>
+                    </Link>
+                    <Link href="/optimize" className="block">
+                      <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+                        <CardHeader>
+                          <DollarSign className="h-8 w-8 mb-2" />
+                          <CardTitle className="text-lg">Optimize Strategy</CardTitle>
+                          <CardDescription>
+                            Get recommendations to maximize rewards
+                          </CardDescription>
+                        </CardHeader>
+                      </Card>
+                    </Link>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : openOrders && openOrders.orders && openOrders.orders.length > 0 ? (
-            <Card className="border-green-500 border-2">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Orders Tab */}
+            <TabsContent value="orders" className="space-y-6">
+              {!hasCredentials ? (
+                <Card className="border-blue-500 border-2">
+                  <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-green-500" />
+                      <DollarSign className="h-5 w-5 text-blue-500" />
+                      Open Orders (Earning Rewards)
+                    </CardTitle>
+                    <CardDescription>Your limit orders on the book that earn maker rewards</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 mx-auto text-blue-500 mb-4" />
+                    <p className="font-medium mb-2">Setup Required to View Open Orders</p>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      To see your limit orders (the ones earning maker rewards), we need to connect to Polymarket's API.
+                    </p>
+
+                    <div className="space-y-4 max-w-md mx-auto">
+                      {!autoSetupError ? (
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-left">
+                          <p className="text-xs text-blue-800 mb-3">
+                            We'll automatically connect to Polymarket's API using your wallet signature. This takes a few seconds.
+                          </p>
+                          <Button
+                            onClick={handleAutoSetup}
+                            disabled={isAutoSetting}
+                            className="w-full"
+                          >
+                            {isAutoSetting ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Setting up...
+                              </>
+                            ) : (
+                              'Connect to Polymarket API'
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-left">
+                          <p className="text-sm font-semibold text-amber-900 mb-2">Setup Failed</p>
+                          <p className="text-xs text-amber-800 mb-3">
+                            {autoSetupError}
+                          </p>
+                          <Button
+                            onClick={() => setAutoSetupError(null)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Try Again
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : openOrders && openOrders.orders && openOrders.orders.length > 0 ? (
+                <Card className="border-green-500 border-2">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <DollarSign className="h-5 w-5 text-green-500" />
+                          Open Orders (Earning Rewards)
+                        </CardTitle>
+                        <CardDescription>Your active limit orders earning maker rewards</CardDescription>
+                      </div>
+                      <div className="text-sm font-medium text-green-600">
+                        {openOrders.summary.totalOrders} order{openOrders.summary.totalOrders !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-xs text-green-900">
+                        <strong>These orders earn rewards!</strong> Your limit orders are on the order book providing liquidity.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      {openOrders.orders.slice(0, 20).map((order: any, i: number) => (
+                        <div
+                          key={order.id || i}
+                          className="flex items-center justify-between py-3 border-b last:border-0"
+                        >
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-medium px-2 py-1 rounded ${
+                                order.side === 'BUY'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-red-100 text-red-700'
+                              }`}>
+                                {order.side}
+                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                order.outcome === 'Yes' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                              }`}>
+                                {order.outcome || (order.side === 'BUY' ? 'Yes' : 'No')}
+                              </span>
+                            </div>
+                            <p className="text-sm font-medium mt-1">
+                              {order.marketName || order.market || 'Loading market...'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Price: ${parseFloat(order.price || 0).toFixed(4)} •
+                              Size: {parseFloat(order.size || order.original_size || 0).toFixed(0)} shares
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs font-medium text-green-600">
+                              Earning Rewards
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {openOrders.orders.length > 20 && (
+                      <p className="text-sm text-muted-foreground text-center mt-4">
+                        + {openOrders.orders.length - 20} more orders
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5" />
                       Open Orders (Earning Rewards)
                     </CardTitle>
                     <CardDescription>Your active limit orders earning maker rewards</CardDescription>
-                  </div>
-                  <div className="text-sm font-medium text-green-600">
-                    {openOrders.summary.totalOrders} order{openOrders.summary.totalOrders !== 1 ? 's' : ''}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-xs text-green-900">
-                    <strong>✅ These orders earn rewards!</strong> Your limit orders are on the order book providing liquidity.
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  {openOrders.orders.slice(0, 20).map((order: any, i: number) => (
-                    <div
-                      key={order.id || i}
-                      className="flex items-center justify-between py-3 border-b last:border-0"
-                    >
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-medium px-2 py-1 rounded ${
-                            order.side === 'BUY'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}>
-                            {order.side}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded ${
-                            order.outcome === 'Yes' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                          }`}>
-                            {order.outcome || (order.side === 'BUY' ? 'Yes' : 'No')}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium mt-1">
-                          {order.marketName || order.market || 'Loading market...'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Price: ${parseFloat(order.price || 0).toFixed(4)} •
-                          Size: {parseFloat(order.size || order.original_size || 0).toFixed(0)} shares
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-medium text-green-600">
-                          Earning Rewards
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {openOrders.orders.length > 20 && (
-                  <p className="text-sm text-muted-foreground text-center mt-4">
-                    + {openOrders.orders.length - 20} more orders
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          ) : hasCredentials ? (
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Open Orders (Earning Rewards)
-                </CardTitle>
-                <CardDescription>Your active limit orders earning maker rewards</CardDescription>
-              </CardHeader>
-              <CardContent className="text-center py-8">
-                <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="font-medium mb-2">No Open Orders</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  You don't have any limit orders on the book. Place limit orders on Polymarket to earn maker rewards.
-                </p>
-                <Button asChild variant="outline">
-                  <a
-                    href="https://polymarket.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Go to Polymarket
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {/* Active Positions - From Public API (no credentials needed!) */}
-          {activePositions && activePositions.positions && activePositions.positions.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Active Positions</CardTitle>
-                    <CardDescription>Your positions in open markets (not yet resolved)</CardDescription>
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground">
-                    {activePositions.summary.totalPositions} open market{activePositions.summary.totalPositions !== 1 ? 's' : ''}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3 mb-4">
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Total Value</p>
-                    <p className="text-lg font-bold">{formatUSD(activePositions.summary.totalValue)}</p>
-                  </div>
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Total PnL</p>
-                    <p className={`text-lg font-bold ${activePositions.summary.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {activePositions.summary.totalPnl >= 0 ? '+' : ''}{formatUSD(activePositions.summary.totalPnl)}
+                  </CardHeader>
+                  <CardContent className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="font-medium mb-2">No Open Orders</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      You don't have any limit orders on the book. Place limit orders on Polymarket to earn maker rewards.
                     </p>
-                  </div>
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Markets</p>
-                    <p className="text-lg font-bold">{activePositions.summary.totalPositions}</p>
-                  </div>
-                </div>
-
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs text-blue-900">
-                    <strong>💡 Note:</strong> These are your current positions (shares held) in open markets.
-                    To earn maker rewards, you need active limit orders on the order book, not just positions.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  {activePositions.positions.slice(0, 10).map((position: any, i: number) => (
-                    <div
-                      key={position.asset || i}
-                      className="flex items-center justify-between py-3 border-b last:border-0"
-                    >
-                      <div className="space-y-1 flex-1">
-                        <p className="font-medium text-sm">{position.title}</p>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className={`font-medium ${
-                            position.outcome === 'Yes' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {position.outcome}
-                          </span>
-                          <span>•</span>
-                          <span>{position.size.toFixed(0)} shares @ {formatUSD(position.avgPrice)}</span>
-                        </div>
-                      </div>
-                      <div className="text-right space-y-1">
-                        <p className="text-sm font-medium">{formatUSD(position.currentValue)}</p>
-                        <p className={`text-xs font-medium ${position.cashPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {position.cashPnl >= 0 ? '+' : ''}{formatUSD(position.cashPnl)} ({position.percentPnl >= 0 ? '+' : ''}{position.percentPnl.toFixed(1)}%)
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {activePositions.positions.length > 10 && (
-                  <p className="text-sm text-muted-foreground text-center mt-4">
-                    + {activePositions.positions.length - 10} more positions
-                  </p>
-                )}
-                <Button asChild variant="outline" className="w-full mt-4">
-                  <a
-                    href="https://polymarket.com/portfolio"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    View on Polymarket
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle>Active Positions</CardTitle>
-                <CardDescription>Your current market positions</CardDescription>
-              </CardHeader>
-              <CardContent className="text-center py-8">
-                <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="font-medium mb-2">No Active Positions</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Start trading on Polymarket to see your positions here
-                </p>
-                <Button asChild variant="outline">
-                  <a
-                    href="https://polymarket.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Go to Polymarket
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {positions && positions.positions && positions.positions.length > 0 && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Your Markets</CardTitle>
-                    <CardDescription>
-                      Markets where you have active positions (scanned from your portfolio)
-                    </CardDescription>
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground">
-                    {positions.summary.totalMarkets} market{positions.summary.totalMarkets !== 1 ? 's' : ''}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {positions.positions.map((position: any, i: number) => (
-                    <div
-                      key={position.marketId}
-                      className="flex items-center justify-between py-3 border-b last:border-0"
-                    >
-                      <div className="space-y-1 flex-1">
-                        <Link
-                          href={`/markets/${position.marketId}`}
-                          className="font-medium text-sm hover:underline"
-                        >
-                          {position.market.question}
-                        </Link>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span>{position.orderCount} order{position.orderCount !== 1 ? 's' : ''}</span>
-                          <span>•</span>
-                          <span>Capital: {formatUSD(position.capitalDeployed)}</span>
-                          {position.estimatedDaily > 0 && (
-                            <>
-                              <span>•</span>
-                              <span className="text-green-600">
-                                Est. {formatUSD(position.estimatedDaily)}/day
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {position.market.active ? (
-                          <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">
-                            Ended
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 pt-4 border-t">
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Total Capital</p>
-                      <p className="text-lg font-bold">{formatUSD(positions.summary.totalCapitalDeployed)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Est. Daily Rewards</p>
-                      <p className="text-lg font-bold text-green-600">
-                        {formatUSD(positions.summary.totalDailyReward)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Recent Rewards */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Recent Rewards</CardTitle>
-                  <CardDescription>Your latest earnings</CardDescription>
-                </div>
-                {rewards?.rewards?.length > 5 && (
-                  <Link href="/history">
-                    <Button variant="ghost" size="sm">
-                      View All
-                      <ExternalLink className="ml-2 h-4 w-4" />
+                    <Button asChild variant="outline">
+                      <a
+                        href="https://polymarket.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Go to Polymarket
+                        <ExternalLink className="ml-2 h-4 w-4" />
+                      </a>
                     </Button>
-                  </Link>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {rewards?.rewards?.length > 0 ? (
-                <div className="space-y-3">
-                  {rewards.rewards.slice(0, 5).map((reward: any, i: number) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between py-3 border-b last:border-0"
-                    >
-                      <div className="space-y-1">
-                        <p className="font-medium text-sm">
-                          {reward.description || 'Market Maker Reward'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(reward.timestamp * 1000), 'MMM d, yyyy')}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-green-600">
-                          +{formatUSD(parseFloat(reward.usdcSize || reward.cash_amount || 0))}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 space-y-4">
-                  <DollarSign className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <div>
-                    <p className="font-medium mb-1">No rewards found</p>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      No market maker rewards found for this wallet address
-                    </p>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4 text-left max-w-md mx-auto">
-                      <p className="text-sm font-medium text-blue-900 mb-2">
-                        💡 Connected with the wrong wallet?
-                      </p>
-                      <p className="text-xs text-blue-700 mb-2">
-                        Make sure you're connected with the wallet you use for trading on Polymarket.
-                      </p>
-                      <p className="text-xs text-blue-600 font-mono">
-                        Current: {address?.slice(0, 10)}...{address?.slice(-8)}
-                      </p>
-                    </div>
-                  </div>
-                  <Button asChild variant="outline">
-                    <a
-                      href="https://polymarket.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Go to Polymarket
-                      <ExternalLink className="ml-2 h-4 w-4" />
-                    </a>
-                  </Button>
-                </div>
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>
-                Explore markets and optimize your strategy
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 md:grid-cols-2">
-                <Link href="/discover" className="block">
-                  <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
-                    <CardHeader>
-                      <TrendingUp className="h-8 w-8 mb-2" />
-                      <CardTitle className="text-lg">Discover Markets</CardTitle>
-                      <CardDescription>
-                        Find the best opportunities for your capital
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </Link>
-                <Link href="/optimize" className="block">
-                  <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
-                    <CardHeader>
-                      <DollarSign className="h-8 w-8 mb-2" />
-                      <CardTitle className="text-lg">Optimize Strategy</CardTitle>
-                      <CardDescription>
-                        Get recommendations to maximize rewards
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Positions Tab */}
+            <TabsContent value="positions" className="space-y-6">
+              {/* Active Positions */}
+              {activePositions && activePositions.positions && activePositions.positions.length > 0 ? (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Active Positions</CardTitle>
+                        <CardDescription>Your positions in open markets (not yet resolved)</CardDescription>
+                      </div>
+                      <div className="text-sm font-medium text-muted-foreground">
+                        {activePositions.summary.totalPositions} open market{activePositions.summary.totalPositions !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 md:grid-cols-3 mb-4">
+                      <div className="text-center p-3 bg-muted rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Total Value</p>
+                        <p className="text-lg font-bold">{formatUSD(activePositions.summary.totalValue)}</p>
+                      </div>
+                      <div className="text-center p-3 bg-muted rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Total PnL</p>
+                        <p className={`text-lg font-bold ${activePositions.summary.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {activePositions.summary.totalPnl >= 0 ? '+' : ''}{formatUSD(activePositions.summary.totalPnl)}
+                        </p>
+                      </div>
+                      <div className="text-center p-3 bg-muted rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Markets</p>
+                        <p className="text-lg font-bold">{activePositions.summary.totalPositions}</p>
+                      </div>
+                    </div>
+
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs text-blue-900">
+                        <strong>Note:</strong> These are your current positions (shares held) in open markets.
+                        To earn maker rewards, you need active limit orders on the order book, not just positions.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      {activePositions.positions.slice(0, 10).map((position: any, i: number) => (
+                        <div
+                          key={position.asset || i}
+                          className="flex items-center justify-between py-3 border-b last:border-0"
+                        >
+                          <div className="space-y-1 flex-1">
+                            <p className="font-medium text-sm">{position.title}</p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className={`font-medium ${
+                                position.outcome === 'Yes' ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {position.outcome}
+                              </span>
+                              <span>•</span>
+                              <span>{position.size.toFixed(0)} shares @ {formatUSD(position.avgPrice)}</span>
+                            </div>
+                          </div>
+                          <div className="text-right space-y-1">
+                            <p className="text-sm font-medium">{formatUSD(position.currentValue)}</p>
+                            <p className={`text-xs font-medium ${position.cashPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {position.cashPnl >= 0 ? '+' : ''}{formatUSD(position.cashPnl)} ({position.percentPnl >= 0 ? '+' : ''}{position.percentPnl.toFixed(1)}%)
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {activePositions.positions.length > 10 && (
+                      <p className="text-sm text-muted-foreground text-center mt-4">
+                        + {activePositions.positions.length - 10} more positions
+                      </p>
+                    )}
+                    <Button asChild variant="outline" className="w-full mt-4">
+                      <a
+                        href="https://polymarket.com/portfolio"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        View on Polymarket
+                        <ExternalLink className="ml-2 h-4 w-4" />
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle>Active Positions</CardTitle>
+                    <CardDescription>Your current market positions</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center py-8">
+                    <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="font-medium mb-2">No Active Positions</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Start trading on Polymarket to see your positions here
+                    </p>
+                    <Button asChild variant="outline">
+                      <a
+                        href="https://polymarket.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Go to Polymarket
+                        <ExternalLink className="ml-2 h-4 w-4" />
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Your Markets */}
+              {positions && positions.positions && positions.positions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Your Markets</CardTitle>
+                        <CardDescription>
+                          Markets where you have active positions (scanned from your portfolio)
+                        </CardDescription>
+                      </div>
+                      <div className="text-sm font-medium text-muted-foreground">
+                        {positions.summary.totalMarkets} market{positions.summary.totalMarkets !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {positions.positions.map((position: any, i: number) => (
+                        <div
+                          key={position.marketId}
+                          className="flex items-center justify-between py-3 border-b last:border-0"
+                        >
+                          <div className="space-y-1 flex-1">
+                            <Link
+                              href={`/markets/${position.marketId}`}
+                              className="font-medium text-sm hover:underline"
+                            >
+                              {position.market.question}
+                            </Link>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span>{position.orderCount} order{position.orderCount !== 1 ? 's' : ''}</span>
+                              <span>•</span>
+                              <span>Capital: {formatUSD(position.capitalDeployed)}</span>
+                              {position.estimatedDaily > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-green-600">
+                                    Est. {formatUSD(position.estimatedDaily)}/day
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {position.market.active ? (
+                              <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">
+                                Ended
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Total Capital</p>
+                          <p className="text-lg font-bold">{formatUSD(positions.summary.totalCapitalDeployed)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Est. Daily Rewards</p>
+                          <p className="text-lg font-bold text-green-600">
+                            {formatUSD(positions.summary.totalDailyReward)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
       <Footer />

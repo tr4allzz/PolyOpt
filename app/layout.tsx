@@ -9,6 +9,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'opt.markets - Polymarket Liquidity Rewards Optimizer',
   description: 'Optimize your Polymarket liquidity provider rewards with Q-score calculations and market analysis',
+  icons: {
+    icon: '/logo.svg',
+    apple: '/logo.svg',
+  },
 }
 
 export default function RootLayout({

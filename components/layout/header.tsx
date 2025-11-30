@@ -3,7 +3,7 @@
 import { ConnectButton } from '@/components/wallet/connect-button'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Menu, X } from 'lucide-react'
+import { Menu, X as MenuClose } from 'lucide-react'
 import { useState } from 'react'
 
 export function Header() {
@@ -13,7 +13,6 @@ export function Header() {
     { href: '/markets', label: 'Markets' },
     { href: '/discover', label: 'Discover' },
     { href: '/portfolio', label: 'Portfolio' },
-    { href: '/community', label: 'Community' },
     { href: '/leaderboard', label: 'Leaderboard' },
   ]
 
@@ -39,6 +38,15 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-4">
+          <a
+            href="https://x.com/optmarkets"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex p-2 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Follow us on X"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
           <ConnectButton />
 
           {/* Mobile Menu Button */}
@@ -48,7 +56,7 @@ export function Header() {
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? (
-              <X className="h-5 w-5" />
+              <MenuClose className="h-5 w-5" />
             ) : (
               <Menu className="h-5 w-5" />
             )}
