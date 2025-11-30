@@ -14,6 +14,8 @@ export interface PolymarketMarket {
   closed: boolean;
   volume: string;
   liquidity: string;
+  volumeClob?: number;
+  liquidityClob?: number;
   outcomePrices?: string; // JSON string of prices like "[\"0.52\", \"0.48\"]"
   lastTradePrice?: number;
   bestBid?: number;

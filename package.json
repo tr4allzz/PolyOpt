@@ -16,7 +16,8 @@
     "prisma:studio": "prisma studio",
     "import-rewards": "npx tsx scripts/import-from-dune.ts",
     "import-rewards-csv": "npx tsx scripts/import-transactions-from-csv.ts",
-    "sync-leaderboard": "npx tsx scripts/sync-leaderboard.ts"
+    "sync-leaderboard": "npx tsx scripts/sync-leaderboard.ts",
+    "sync-markets": "npx tsx scripts/sync-markets.ts"
   },
   "repository": {
     "type": "git",
