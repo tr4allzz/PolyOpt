@@ -50,6 +50,7 @@ enum Tier {
 model Market {
   id            String   @id // Polymarket Gamma API ID (numeric)
   conditionId   String?  @unique // Polymarket condition ID (hex) - for Data API
+  clobTokenIds  String?  // JSON array of CLOB token IDs [YES, NO] for order book API
   question      String
   description   String?
 

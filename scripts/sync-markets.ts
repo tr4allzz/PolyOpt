@@ -19,10 +19,12 @@ interface CLOBResponse {
 interface GammaMarket {
   id: string;
   conditionId: string;
+  clobTokenIds?: string; // JSON array string e.g. '["123...", "456..."]'
   volumeClob?: number;
   liquidityClob?: number;
   volume?: string;
   liquidity?: string;
+  outcomePrices?: string; // JSON array string e.g. '["0.65", "0.35"]'
 }
 
 async function syncMarkets() {
@@ -91,19 +93,34 @@ async function syncMarkets() {
           continue;
         }
 
-        // Get volume/liquidity from Gamma API
+        // Get volume/liquidity/tokenIds from Gamma API
         const gammaMarket = gammaMap.get(rewardMarket.condition_id);
         const volume = gammaMarket ? (gammaMarket.volumeClob || parseFloat(gammaMarket.volume || '0')) : 0;
         const liquidity = gammaMarket ? (gammaMarket.liquidityClob || parseFloat(gammaMarket.liquidity || '0')) : 0;
+        const clobTokenIds = gammaMarket?.clobTokenIds || null;
+
+        // Parse midpoint from Gamma API prices if available
+        let midpoint = 0.5;
+        if (gammaMarket?.outcomePrices) {
+          try {
+            const prices = JSON.parse(gammaMarket.outcomePrices);
+            if (prices.length >= 1) {
+              midpoint = parseFloat(prices[0]) || 0.5;
+            }
+          } catch (e) {
+            // Keep default midpoint
+          }
+        }
 
         const marketData = {
           question: marketDetails.question,
           description: marketDetails.description || '',
           conditionId: rewardMarket.condition_id,
-          maxSpread: parseFloat(marketDetails.rewards?.max_spread || '0.05'),
+          clobTokenIds, // Store token IDs for order book queries
+          maxSpread: parseFloat(marketDetails.rewards?.max_spread || '5') / 100, // API returns cents, convert to decimal
           minSize: parseFloat(marketDetails.rewards?.min_size || '100'),
           rewardPool: dailyRewardPool,
-          midpoint: 0.5, // Default, will be updated from orderbook if needed
+          midpoint,
           volume,
           liquidity,
           endDate: marketDetails.end_date_iso ? new Date(marketDetails.end_date_iso) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),

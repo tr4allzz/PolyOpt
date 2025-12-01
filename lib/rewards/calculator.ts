@@ -33,12 +33,17 @@ export function calculateOrderScore(
 
 /**
  * Calculate spread from midpoint for an order
+ * For YES orders: spread from YES midpoint
+ * For NO orders: spread from NO midpoint (1 - YES midpoint)
  */
 export function calculateSpread(
   orderPrice: number,
-  midpoint: number
+  midpoint: number,
+  side?: 'YES' | 'NO'
 ): number {
-  return Math.abs(orderPrice - midpoint);
+  // For NO orders, the midpoint is 1 - YES_midpoint
+  const effectiveMidpoint = side === 'NO' ? (1 - midpoint) : midpoint;
+  return Math.abs(orderPrice - effectiveMidpoint);
 }
 
 /**
@@ -61,7 +66,7 @@ export function calculateQOne(
       continue;
     }
 
-    const spread = calculateSpread(order.price, market.midpoint);
+    const spread = calculateSpread(order.price, market.midpoint, order.side);
 
     // Only count YES bids and NO asks
     if (
@@ -99,7 +104,7 @@ export function calculateQTwo(
       continue;
     }
 
-    const spread = calculateSpread(order.price, market.midpoint);
+    const spread = calculateSpread(order.price, market.midpoint, order.side);
 
     // Only count YES asks and NO bids
     if (
