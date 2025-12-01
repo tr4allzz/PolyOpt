@@ -65,7 +65,7 @@ export default function AboutPage() {
             <div className="space-y-4">
               <p className="text-lg text-muted-foreground">
                 opt.markets exists to level the playing field for Polymarket liquidity providers. We believe that
-                transparent, data-driven tools should be accessible to everyone—not just institutional players.
+                transparent, data-driven tools should be accessible to everyone.
               </p>
               <p className="text-lg text-muted-foreground">
                 By implementing Polymarket's public reward formula and analyzing on-chain data, we help LPs
