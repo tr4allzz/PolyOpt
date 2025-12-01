@@ -48,12 +48,26 @@ async function syncMarkets() {
     );
     console.log(`✅ Active markets with rewards: ${marketsWithRewards.length}\n`);
 
-    // Step 2: Fetch volume/liquidity from Gamma API
+    // Step 2: Fetch volume/liquidity from Gamma API (paginate if needed)
     console.log('Fetching volume/liquidity from Gamma API...');
-    const gammaResponse = await fetch('https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=1000');
-    const gammaMarkets: GammaMarket[] = await gammaResponse.json();
-    const gammaMap = new Map(gammaMarkets.map(m => [m.conditionId, m]));
-    console.log(`📊 Received ${gammaMarkets.length} markets from Gamma API\n`);
+    let allGammaMarkets: GammaMarket[] = [];
+    let offset = 0;
+    const limit = 500;
+
+    while (true) {
+      const gammaResponse = await fetch(`https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=${limit}&offset=${offset}`);
+      const gammaMarkets: GammaMarket[] = await gammaResponse.json();
+
+      if (gammaMarkets.length === 0) break;
+
+      allGammaMarkets = allGammaMarkets.concat(gammaMarkets);
+      offset += limit;
+
+      if (gammaMarkets.length < limit) break;
+    }
+
+    const gammaMap = new Map(allGammaMarkets.map(m => [m.conditionId, m]));
+    console.log(`📊 Received ${allGammaMarkets.length} markets from Gamma API\n`);
 
     let created = 0;
     let updated = 0;
@@ -95,6 +109,9 @@ async function syncMarkets() {
 
         // Get volume/liquidity/tokenIds from Gamma API
         const gammaMarket = gammaMap.get(rewardMarket.condition_id);
+        if (!gammaMarket) {
+          console.log(`⚠️  No Gamma data for: ${marketDetails.question?.substring(0, 50)}...`);
+        }
         const volume = gammaMarket ? (gammaMarket.volumeClob || parseFloat(gammaMarket.volume || '0')) : 0;
         const liquidity = gammaMarket ? (gammaMarket.liquidityClob || parseFloat(gammaMarket.liquidity || '0')) : 0;
         const clobTokenIds = gammaMarket?.clobTokenIds || null;
