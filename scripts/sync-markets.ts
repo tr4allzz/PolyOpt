@@ -28,11 +28,8 @@ interface GammaMarket {
 }
 
 async function syncMarkets() {
-  console.log('🔄 Syncing reward markets from Polymarket CLOB API...\n');
 
   try {
-    // Step 1: Fetch reward markets list from CLOB API
-    console.log('Fetching reward markets from CLOB API...');
     const samplingResponse = await fetch('https://clob.polymarket.com/sampling-simplified-markets');
 
     if (!samplingResponse.ok) {

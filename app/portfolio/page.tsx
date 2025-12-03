@@ -11,7 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatUSD } from '@/lib/polymarket/utils'
-import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart, ArrowRight } from 'lucide-react'
+import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart, ArrowRight, Calendar } from 'lucide-react'
+import { RewardsCalendar } from '@/components/portfolio/rewards-calendar'
+import { StreakTracker } from '@/components/portfolio/streak-tracker'
 import { ConnectButton } from '@/components/wallet/connect-button'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -243,10 +245,14 @@ export default function PortfolioPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+            <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="rewards" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span className="hidden sm:inline">Rewards</span>
               </TabsTrigger>
               <TabsTrigger value="orders" className="flex items-center gap-2">
                 <ListOrdered className="h-4 w-4" />
@@ -439,6 +445,80 @@ export default function PortfolioPage() {
                       </Card>
                     </Link>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Rewards Tab */}
+            <TabsContent value="rewards" className="space-y-6">
+              {/* Calendar & Streak Section */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <RewardsCalendar rewards={rewards?.rewards || []} days={30} />
+                <StreakTracker rewards={rewards?.rewards || []} />
+              </div>
+
+              {/* Rewards History */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Rewards History</CardTitle>
+                      <CardDescription>All your earnings from market making</CardDescription>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {rewards?.summary?.totalRewards || 0} total rewards
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {rewards?.rewards?.length > 0 ? (
+                    <div className="space-y-3">
+                      {rewards.rewards.map((reward: any, i: number) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between py-3 border-b last:border-0"
+                        >
+                          <div className="space-y-1">
+                            <p className="font-medium text-sm">
+                              {reward.description || 'Market Maker Reward'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {reward.timestamp
+                                ? format(new Date(reward.timestamp * 1000), 'MMM d, yyyy h:mm a')
+                                : reward.date
+                                  ? format(new Date(reward.date), 'MMM d, yyyy h:mm a')
+                                  : 'Unknown date'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600">
+                              +{formatUSD(parseFloat(reward.usdcSize || reward.cash_amount || 0))}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 space-y-4">
+                      <DollarSign className="h-12 w-12 mx-auto text-muted-foreground" />
+                      <div>
+                        <p className="font-medium mb-1">No rewards found</p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Start placing limit orders on markets to earn rewards
+                        </p>
+                      </div>
+                      <Button asChild variant="outline">
+                        <a
+                          href="https://polymarket.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Go to Polymarket
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
