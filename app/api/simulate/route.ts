@@ -8,6 +8,35 @@ import {
 } from '@/lib/rewards/calculator';
 import { Market, Order } from '@/types/rewards';
 
+const GAMMA_API = 'https://gamma-api.polymarket.com';
+
+/**
+ * Fetch fresh midpoint from Polymarket API
+ */
+async function fetchFreshMidpoint(marketId: string): Promise<number | null> {
+  try {
+    const response = await fetch(`${GAMMA_API}/markets/${marketId}`, {
+      next: { revalidate: 0 }, // No cache
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+
+    if (data.outcomePrices) {
+      const prices = JSON.parse(data.outcomePrices);
+      if (prices.length >= 2) {
+        return parseFloat(prices[0]); // YES price
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching fresh midpoint:', error);
+    return null;
+  }
+}
+
 interface SimulateRequest {
   marketId: string;
   capital: number;
@@ -85,11 +114,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Convert to rewards Market type
+    // Fetch fresh midpoint from Polymarket API
+    const freshMidpoint = await fetchFreshMidpoint(marketId);
+
+    // Convert to rewards Market type, use fresh midpoint if available
     const market: Market = {
       id: dbMarket.id,
       question: dbMarket.question,
-      midpoint: dbMarket.midpoint,
+      midpoint: freshMidpoint ?? dbMarket.midpoint,
       maxSpread: dbMarket.maxSpread,
       minSize: dbMarket.minSize,
       rewardPool: dbMarket.rewardPool,
