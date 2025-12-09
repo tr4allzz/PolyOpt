@@ -160,20 +160,23 @@ function calculateStrategy(
       { price: sellPrice, size: sellSize, side: 'YES', type: 'ASK' }
     );
 
+    const buyQty = Math.floor(buySize);
+    const sellQty = Math.floor(sellSize);
+
     orderDetails.push(
       {
         side: 'BUY',
         outcome: 'YES',
-        price: buyPrice.toFixed(3),
-        size: Math.floor(buySize),
-        cost: ((capital * 0.5)).toFixed(2),
+        price: `${(buyPrice * 100).toFixed(1)}¢`,
+        size: buyQty,
+        cost: (buyQty * buyPrice).toFixed(2),
       },
       {
         side: 'SELL',
         outcome: 'YES',
-        price: sellPrice.toFixed(3),
-        size: Math.floor(sellSize),
-        cost: ((capital * 0.5)).toFixed(2),
+        price: `${(sellPrice * 100).toFixed(1)}¢`,
+        size: sellQty,
+        cost: (sellQty * sellPrice).toFixed(2),
       }
     );
   } else if (config.singleSided === 'NO') {
@@ -189,20 +192,23 @@ function calculateStrategy(
       { price: sellPrice, size: sellSize, side: 'NO', type: 'ASK' }
     );
 
+    const buyQty = Math.floor(buySize);
+    const sellQty = Math.floor(sellSize);
+
     orderDetails.push(
       {
         side: 'BUY',
         outcome: 'NO',
-        price: buyPrice.toFixed(3),
-        size: Math.floor(buySize),
-        cost: ((capital * 0.5)).toFixed(2),
+        price: `${(buyPrice * 100).toFixed(1)}¢`,
+        size: buyQty,
+        cost: (buyQty * buyPrice).toFixed(2),
       },
       {
         side: 'SELL',
         outcome: 'NO',
-        price: sellPrice.toFixed(3),
-        size: Math.floor(sellSize),
-        cost: ((capital * 0.5)).toFixed(2),
+        price: `${(sellPrice * 100).toFixed(1)}¢`,
+        size: sellQty,
+        cost: (sellQty * sellPrice).toFixed(2),
       }
     );
   } else {
@@ -217,20 +223,23 @@ function calculateStrategy(
       { price: yesSellPrice, size: yesSellSize, side: 'YES', type: 'ASK' }
     );
 
+    const buyQty = Math.floor(yesBuySize);
+    const sellQty = Math.floor(yesSellSize);
+
     orderDetails.push(
       {
         side: 'BUY',
         outcome: 'YES',
-        price: yesBuyPrice.toFixed(3),
-        size: Math.floor(yesBuySize),
-        cost: ((capital * 0.5)).toFixed(2),
+        price: `${(yesBuyPrice * 100).toFixed(1)}¢`,
+        size: buyQty,
+        cost: (buyQty * yesBuyPrice).toFixed(2),
       },
       {
         side: 'SELL',
         outcome: 'YES',
-        price: yesSellPrice.toFixed(3),
-        size: Math.floor(yesSellSize),
-        cost: ((capital * 0.5)).toFixed(2),
+        price: `${(yesSellPrice * 100).toFixed(1)}¢`,
+        size: sellQty,
+        cost: (sellQty * yesSellPrice).toFixed(2),
       }
     );
   }
