@@ -117,12 +117,17 @@ export async function POST(request: Request) {
     // Fetch fresh midpoint from Polymarket API
     const freshMidpoint = await fetchFreshMidpoint(marketId);
 
+    // maxSpread is stored as percentage (3.5 = 3.5%), convert to decimal (0.035)
+    const maxSpreadDecimal = dbMarket.maxSpread > 1
+      ? dbMarket.maxSpread / 100
+      : dbMarket.maxSpread;
+
     // Convert to rewards Market type, use fresh midpoint if available
     const market: Market = {
       id: dbMarket.id,
       question: dbMarket.question,
       midpoint: freshMidpoint ?? dbMarket.midpoint,
-      maxSpread: dbMarket.maxSpread,
+      maxSpread: maxSpreadDecimal,
       minSize: dbMarket.minSize,
       rewardPool: dbMarket.rewardPool,
     };
