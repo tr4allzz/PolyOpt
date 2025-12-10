@@ -186,66 +186,68 @@ function calculateStrategy(
   const orderDetails: any[] = [];
 
   if (config.singleSided === 'YES') {
-    // Single-sided YES: BID (buy YES) and ASK (sell YES)
-    const buyPrice = market.midpoint - spreadFromMid;
-    const sellPrice = market.midpoint + spreadFromMid;
-    const buySize = (capital * 0.5) / buyPrice;
-    const sellSize = (capital * 0.5) / sellPrice;
+    // Single-sided YES: Multiple BUY YES orders at different price levels
+    // Note: This only provides one-sided liquidity (reduced rewards)
+    const price1 = market.midpoint - spreadFromMid;       // Closer to midpoint
+    const price2 = market.midpoint - spreadFromMid * 1.5; // Further from midpoint
+    const size1 = (capital * 0.6) / price1; // More capital at better price
+    const size2 = (capital * 0.4) / price2; // Less capital at safer price
 
     orders.push(
-      { price: buyPrice, size: buySize, side: 'YES', type: 'BID' },
-      { price: sellPrice, size: sellSize, side: 'YES', type: 'ASK' }
+      { price: price1, size: size1, side: 'YES', type: 'BID' },
+      { price: price2, size: size2, side: 'YES', type: 'BID' }
     );
 
-    const buyQty = Math.floor(buySize);
-    const sellQty = Math.floor(sellSize);
+    const qty1 = Math.floor(size1);
+    const qty2 = Math.floor(size2);
 
     orderDetails.push(
       {
         side: 'BUY',
         outcome: 'YES',
-        price: `${(buyPrice * 100).toFixed(1)}¢`,
-        size: buyQty,
-        cost: (buyQty * buyPrice).toFixed(2),
+        price: `${(price1 * 100).toFixed(1)}¢`,
+        size: qty1,
+        cost: (qty1 * price1).toFixed(2),
       },
       {
-        side: 'SELL',
+        side: 'BUY',
         outcome: 'YES',
-        price: `${(sellPrice * 100).toFixed(1)}¢`,
-        size: sellQty,
-        cost: (sellQty * sellPrice).toFixed(2),
+        price: `${(price2 * 100).toFixed(1)}¢`,
+        size: qty2,
+        cost: (qty2 * price2).toFixed(2),
       }
     );
   } else if (config.singleSided === 'NO') {
-    // Single-sided NO: BID (buy NO) and ASK (sell NO)
+    // Single-sided NO: Multiple BUY NO orders at different price levels
+    // Note: This only provides one-sided liquidity (reduced rewards)
     const noMidpoint = 1 - market.midpoint;
-    const buyPrice = noMidpoint - spreadFromMid;
-    const sellPrice = noMidpoint + spreadFromMid;
-    const buySize = (capital * 0.5) / buyPrice;
-    const sellSize = (capital * 0.5) / sellPrice;
+    const price1 = noMidpoint - spreadFromMid;       // Closer to midpoint
+    const price2 = noMidpoint - spreadFromMid * 1.5; // Further from midpoint
+    const size1 = (capital * 0.6) / price1;
+    const size2 = (capital * 0.4) / price2;
 
     orders.push(
-      { price: buyPrice, size: buySize, side: 'NO', type: 'BID' },
-      { price: sellPrice, size: sellSize, side: 'NO', type: 'ASK' }
+      { price: price1, size: size1, side: 'NO', type: 'BID' },
+      { price: price2, size: size2, side: 'NO', type: 'BID' }
     );
 
-    const buyQty = Math.floor(buySize);
-    const sellQty = Math.floor(sellSize);
+    const qty1 = Math.floor(size1);
+    const qty2 = Math.floor(size2);
 
     orderDetails.push(
       {
         side: 'BUY',
         outcome: 'NO',
-        price: `${(buyPrice * 100).toFixed(1)}¢`,
-        size: buyQty,
-        cost: (buyQty * buyPrice).toFixed(2),
+        price: `${(price1 * 100).toFixed(1)}¢`,
+        size: qty1,
+        cost: (qty1 * price1).toFixed(2),
       },
       {
-        side: 'SELL',
+        side: 'BUY',
         outcome: 'NO',
-        price: `${(sellPrice * 100).toFixed(1)}¢`,
-        size: sellQty,
-        cost: (sellQty * sellPrice).toFixed(2),
+        price: `${(price2 * 100).toFixed(1)}¢`,
+        size: qty2,
+        cost: (qty2 * price2).toFixed(2),
       }
     );
   } else {
