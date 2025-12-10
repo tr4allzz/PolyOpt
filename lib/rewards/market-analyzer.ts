@@ -87,22 +87,27 @@ export async function analyzeBestMarketsForCapital(
       else competitionLevel = 'High';
 
       // Recommended minimum capital to be competitive (get at least 1% of rewards)
+      // Based on: minSize for both sides + buffer for spread
+      const minCapitalForOrders = market.minSize * market.midpoint * 2.2; // Both sides + 10% buffer
       const recommendedCapital = Math.max(
-        market.minSize * market.midpoint * 2, // Cover both sides
-        (estimatedCompetition * 0.01) * capital // 1% of total competition
+        minCapitalForOrders,
+        estimatedCompetition * 0.05 // Need ~5% of competition to get meaningful share
       );
 
-      opportunities.push({
-        marketId: market.id,
-        question: market.question,
-        rewardPool: market.rewardPool,
-        estimatedCompetition,
-        estimatedDailyReward,
-        capitalEfficiency,
-        roi,
-        competitionLevel,
-        recommendedCapital,
-      });
+      // Only include markets where user has enough capital
+      if (capital >= recommendedCapital * 0.8) { // Allow 20% flexibility
+        opportunities.push({
+          marketId: market.id,
+          question: market.question,
+          rewardPool: market.rewardPool,
+          estimatedCompetition,
+          estimatedDailyReward,
+          capitalEfficiency,
+          roi,
+          competitionLevel,
+          recommendedCapital,
+        });
+      }
     } catch (error) {
       console.error(`Error analyzing market ${market.id}:`, error);
     }
