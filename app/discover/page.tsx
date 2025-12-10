@@ -451,13 +451,13 @@ export default function DiscoverPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Buy Price</p>
+                      <p className="text-xs text-muted-foreground">Buy YES at</p>
                       <p className="text-lg font-bold text-green-600">
                         {result.recommendation.buyOrder.price}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Sell Price</p>
+                      <p className="text-xs text-muted-foreground">Buy NO at</p>
                       <p className="text-lg font-bold text-red-600">
                         {result.recommendation.sellOrder.price}
                       </p>

@@ -36,13 +36,19 @@ export function optimizeOrderPlacement(
   // Since spread is same on both sides, equal $ gives balanced Q-scores
   const capitalPerSide = capital / 2;
 
-  const buySize = capitalPerSide / buyPrice;
-  const sellSize = capitalPerSide / sellPrice;
+  // For two-sided liquidity on Polymarket:
+  // - Buy YES at price below midpoint (e.g., 48¢ when midpoint is 50¢)
+  // - Buy NO at price = 1 - sellPrice (e.g., if sellPrice is 52¢, buy NO at 48¢)
+  const buyYesPrice = buyPrice;
+  const buyNoPrice = 1 - sellPrice; // NO price is inverse of YES price
+
+  const buyYesSize = capitalPerSide / buyYesPrice;
+  const buyNoSize = capitalPerSide / buyNoPrice;
 
   // Calculate expected scores
   const orders: Order[] = [
-    { price: buyPrice, size: buySize, side: 'YES', type: 'BID' },
-    { price: sellPrice, size: sellSize, side: 'YES', type: 'ASK' },
+    { price: buyYesPrice, size: buyYesSize, side: 'YES', type: 'BID' },
+    { price: buyNoPrice, size: buyNoSize, side: 'NO', type: 'BID' },
   ];
 
   const expectedQScore = calculateQScore(orders, market);
@@ -56,8 +62,8 @@ export function optimizeOrderPlacement(
   );
 
   return {
-    buyOrder: { price: buyPrice, size: buySize },
-    sellOrder: { price: sellPrice, size: sellSize },
+    buyOrder: { price: buyYesPrice, size: buyYesSize },      // Buy YES order
+    sellOrder: { price: buyNoPrice, size: buyNoSize },       // Buy NO order (provides sell-side liquidity)
     expectedQScore,
     expectedDailyReward: dailyReward,
     capitalEfficiency: dailyReward / capital,
@@ -84,16 +90,17 @@ export function optimizeAdvanced(
 
   for (const spreadRatio of strategies) {
     const spreadFromMid = market.maxSpread * spreadRatio;
-    const buyPrice = market.midpoint - spreadFromMid;
-    const sellPrice = market.midpoint + spreadFromMid;
+    const buyYesPrice = market.midpoint - spreadFromMid;
+    const sellYesPrice = market.midpoint + spreadFromMid;
+    const buyNoPrice = 1 - sellYesPrice; // NO price is inverse
 
     const capitalPerSide = capital / 2;
-    const buySize = capitalPerSide / buyPrice;
-    const sellSize = capitalPerSide / sellPrice;
+    const buyYesSize = capitalPerSide / buyYesPrice;
+    const buyNoSize = capitalPerSide / buyNoPrice;
 
     const orders: Order[] = [
-      { price: buyPrice, size: buySize, side: 'YES', type: 'BID' },
-      { price: sellPrice, size: sellSize, side: 'YES', type: 'ASK' },
+      { price: buyYesPrice, size: buyYesSize, side: 'YES', type: 'BID' },
+      { price: buyNoPrice, size: buyNoSize, side: 'NO', type: 'BID' },
     ];
 
     const expectedQScore = calculateQScore(orders, market);
@@ -107,8 +114,8 @@ export function optimizeAdvanced(
     if (dailyReward > bestExpectedReward) {
       bestExpectedReward = dailyReward;
       bestPlacement = {
-        buyOrder: { price: buyPrice, size: buySize },
-        sellOrder: { price: sellPrice, size: sellSize },
+        buyOrder: { price: buyYesPrice, size: buyYesSize },
+        sellOrder: { price: buyNoPrice, size: buyNoSize },
         expectedQScore,
         expectedDailyReward: dailyReward,
         capitalEfficiency: dailyReward / capital,
