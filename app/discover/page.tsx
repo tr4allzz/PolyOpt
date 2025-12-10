@@ -55,7 +55,6 @@ export default function DiscoverPage() {
   const [maxCapital, setMaxCapital] = useState<number>(1000)
   const [competitionLevel, setCompetitionLevel] = useState<string>('all')
   const [minRewardPool, setMinRewardPool] = useState<number>(0)
-  const [useRealCompetition, setUseRealCompetition] = useState(false)
   const [resultsLimit, setResultsLimit] = useState<number>(50)
 
   const fetchOpportunities = async () => {
@@ -72,7 +71,7 @@ export default function DiscoverPage() {
         body: JSON.stringify({
           capital,
           limit: resultsLimit,
-          useRealCompetition,
+          useRealCompetition: true, // Always use real competition data
           filters: Object.keys(filters).length > 0 ? filters : undefined,
         }),
       })
@@ -284,18 +283,6 @@ export default function DiscoverPage() {
                   </Select>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="useRealCompetition"
-                    checked={useRealCompetition}
-                    onChange={(e) => setUseRealCompetition(e.target.checked)}
-                    className="rounded"
-                  />
-                  <Label htmlFor="useRealCompetition" className="font-normal">
-                    Use real competition data (slower but more accurate)
-                  </Label>
-                </div>
               </div>
             )}
           </CardContent>
