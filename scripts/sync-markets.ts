@@ -172,11 +172,31 @@ async function syncMarkets() {
       }
     }
 
+    // Step 4: Deactivate markets that no longer have rewards
+    console.log('\n🧹 Cleaning up old markets without rewards...');
+    const activeConditionIds = marketsWithRewards.map(m => m.condition_id);
+
+    const deactivated = await prisma.market.updateMany({
+      where: {
+        active: true,
+        conditionId: {
+          notIn: activeConditionIds
+        }
+      },
+      data: {
+        active: false,
+        updatedAt: new Date()
+      }
+    });
+
+    console.log(`   Deactivated: ${deactivated.count} markets without rewards`);
+
     console.log('\n📈 Sync Summary:');
     console.log(`   Created: ${created}`);
     console.log(`   Updated: ${updated}`);
     console.log(`   Skipped: ${skipped}`);
     console.log(`   Failed: ${failed}`);
+    console.log(`   Deactivated: ${deactivated.count}`);
     console.log(`\n✅ Market sync completed successfully!`);
 
   } catch (error) {
