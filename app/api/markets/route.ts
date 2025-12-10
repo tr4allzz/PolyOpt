@@ -15,7 +15,13 @@ export async function GET(request: Request) {
     const activeOnly = searchParams.get('active') !== 'false';
 
     // Fetch markets and count in parallel for better performance
-    const whereClause = activeOnly ? { active: true } : undefined;
+    // Filter out expired markets (endDate in the past)
+    const whereClause = activeOnly
+      ? {
+          active: true,
+          endDate: { gt: new Date() },
+        }
+      : undefined;
 
     const [markets, total] = await Promise.all([
       prisma.market.findMany({
