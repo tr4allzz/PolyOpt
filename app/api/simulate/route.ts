@@ -249,34 +249,34 @@ function calculateStrategy(
       }
     );
   } else {
-    // Two-sided: YES BID + NO BID (or equivalently YES BID + YES ASK)
+    // Two-sided: BUY YES + BUY NO (provides liquidity on both sides)
     const yesBuyPrice = market.midpoint - spreadFromMid;
-    const yesSellPrice = market.midpoint + spreadFromMid;
+    const noBuyPrice = 1 - (market.midpoint + spreadFromMid); // NO price is inverse of YES sell price
     const yesBuySize = (capital * 0.5) / yesBuyPrice;
-    const yesSellSize = (capital * 0.5) / yesSellPrice;
+    const noBuySize = (capital * 0.5) / noBuyPrice;
 
     orders.push(
       { price: yesBuyPrice, size: yesBuySize, side: 'YES', type: 'BID' },
-      { price: yesSellPrice, size: yesSellSize, side: 'YES', type: 'ASK' }
+      { price: noBuyPrice, size: noBuySize, side: 'NO', type: 'BID' }
     );
 
-    const buyQty = Math.floor(yesBuySize);
-    const sellQty = Math.floor(yesSellSize);
+    const yesBuyQty = Math.floor(yesBuySize);
+    const noBuyQty = Math.floor(noBuySize);
 
     orderDetails.push(
       {
         side: 'BUY',
         outcome: 'YES',
         price: `${(yesBuyPrice * 100).toFixed(1)}¢`,
-        size: buyQty,
-        cost: (buyQty * yesBuyPrice).toFixed(2),
+        size: yesBuyQty,
+        cost: (yesBuyQty * yesBuyPrice).toFixed(2),
       },
       {
-        side: 'SELL',
-        outcome: 'YES',
-        price: `${(yesSellPrice * 100).toFixed(1)}¢`,
-        size: sellQty,
-        cost: (sellQty * yesSellPrice).toFixed(2),
+        side: 'BUY',
+        outcome: 'NO',
+        price: `${(noBuyPrice * 100).toFixed(1)}¢`,
+        size: noBuyQty,
+        cost: (noBuyQty * noBuyPrice).toFixed(2),
       }
     );
   }
