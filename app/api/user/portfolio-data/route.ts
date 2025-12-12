@@ -287,33 +287,85 @@ async function fetchOpenOrders(walletAddress: string, user: any) {
     // Build auth headers for CLOB API
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const method = 'GET';
-    const path = '/orders';
+    const path = '/data/orders';
 
-    // Create signature
+    // Create signature: HMAC-SHA256(secret, timestamp + method + path)
     const crypto = await import('crypto');
     const message = timestamp + method + path;
-    const hmac = crypto.createHmac('sha256', Buffer.from(credentials.apiSecret, 'base64'));
+    const base64Secret = Buffer.from(credentials.apiSecret, 'base64');
+    const hmac = crypto.createHmac('sha256', base64Secret);
     hmac.update(message);
     const signature = hmac.digest('base64');
 
-    const url = `${CLOB_API_URL}${path}?market=all`;
+    // URL-safe base64 encoding (convert '+' to '-' and '/' to '_')
+    const signatureUrlSafe = signature.replace(/\+/g, '-').replace(/\//g, '_');
+
+    const url = `${CLOB_API_URL}${path}`;
+
+    console.log(`Fetching open orders from: ${url}`);
+    console.log(`Using wallet address: ${walletAddress}`);
 
     const response = await fetch(url, {
       headers: {
+        'Content-Type': 'application/json',
+        'POLY_ADDRESS': walletAddress,
         'POLY_API_KEY': credentials.apiKey,
-        'POLY_SIGNATURE': signature,
+        'POLY_SIGNATURE': signatureUrlSafe,
         'POLY_TIMESTAMP': timestamp,
         'POLY_PASSPHRASE': credentials.apiPassphrase,
       },
     });
 
     if (!response.ok) {
-      console.error('Failed to fetch orders:', response.status);
+      const errorText = await response.text();
+      console.error('Failed to fetch orders:', response.status, errorText);
       return { orders: [], summary: { totalOrders: 0 } };
     }
 
     const data = await response.json();
-    const orders = Array.isArray(data) ? data : [];
+    console.log('📦 Raw orders response:', JSON.stringify(data).substring(0, 500));
+
+    // API returns { data: [...orders...] } not a direct array
+    const rawOrders = Array.isArray(data) ? data : (data?.data && Array.isArray(data.data) ? data.data : []);
+
+    console.log(`Fetched ${rawOrders.length} open orders`);
+
+    // Fetch market titles for the orders
+    const uniqueMarketIds = [...new Set(rawOrders.map((o: any) => o.market))];
+    const marketTitles: Record<string, string> = {};
+
+    // Fetch market details from CLOB API (in parallel, max 5 at a time)
+    if (uniqueMarketIds.length > 0) {
+      console.log(`Fetching titles for ${uniqueMarketIds.length} markets...`);
+
+      const marketPromises = uniqueMarketIds.map(async (marketId) => {
+        try {
+          const marketRes = await fetch(`https://clob.polymarket.com/markets/${marketId}`, {
+            next: { revalidate: 300 }, // Cache for 5 minutes
+          });
+          if (marketRes.ok) {
+            const marketData = await marketRes.json();
+            return { id: marketId, title: marketData.question || marketData.title || 'Unknown Market' };
+          }
+        } catch (e) {
+          console.warn(`Failed to fetch market ${marketId}`);
+        }
+        return { id: marketId, title: 'Unknown Market' };
+      });
+
+      const marketResults = await Promise.all(marketPromises);
+      for (const result of marketResults) {
+        if (result) {
+          marketTitles[result.id] = result.title;
+        }
+      }
+    }
+
+    // Enrich orders with market titles
+    const orders = rawOrders.map((order: any) => ({
+      ...order,
+      marketTitle: marketTitles[order.market] || 'Unknown Market',
+    }));
 
     return {
       orders,

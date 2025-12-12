@@ -624,7 +624,7 @@ export default function PortfolioPage() {
                               </span>
                             </div>
                             <p className="text-sm font-medium mt-1">
-                              {order.marketName || order.market || 'Loading market...'}
+                              {order.marketTitle || order.marketName || order.market || 'Loading market...'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               Price: ${parseFloat(order.price || 0).toFixed(4)} •
