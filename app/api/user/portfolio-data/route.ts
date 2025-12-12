@@ -338,27 +338,21 @@ async function fetchOpenOrders(walletAddress: string, user: any) {
     if (uniqueMarketIds.length > 0) {
       console.log(`Fetching titles for ${uniqueMarketIds.length} markets...`);
 
-      const marketPromises = uniqueMarketIds.map(async (marketId) => {
+      const marketPromises = uniqueMarketIds.map(async (marketId: string) => {
         try {
           const marketRes = await fetch(`https://clob.polymarket.com/markets/${marketId}`, {
             next: { revalidate: 300 }, // Cache for 5 minutes
           });
           if (marketRes.ok) {
             const marketData = await marketRes.json();
-            return { id: marketId, title: marketData.question || marketData.title || 'Unknown Market' };
+            marketTitles[marketId] = marketData.question || marketData.title || 'Unknown Market';
           }
         } catch (e) {
           console.warn(`Failed to fetch market ${marketId}`);
         }
-        return { id: marketId, title: 'Unknown Market' };
       });
 
-      const marketResults = await Promise.all(marketPromises);
-      for (const result of marketResults) {
-        if (result) {
-          marketTitles[result.id] = result.title;
-        }
-      }
+      await Promise.all(marketPromises);
     }
 
     // Enrich orders with market titles
