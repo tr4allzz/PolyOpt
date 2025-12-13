@@ -331,7 +331,7 @@ async function fetchOpenOrders(walletAddress: string, user: any) {
     console.log(`Fetched ${rawOrders.length} open orders`);
 
     // Fetch market titles for the orders
-    const uniqueMarketIds = [...new Set(rawOrders.map((o: any) => o.market))];
+    const uniqueMarketIds = Array.from(new Set(rawOrders.map((o: any) => o.market))) as string[];
     const marketTitles: Record<string, string> = {};
 
     // Fetch market details from CLOB API (in parallel, max 5 at a time)
