@@ -5,6 +5,7 @@ import {
   calculateExpectedReward
 } from './calculator';
 import { Market, Order, OptimalPlacement } from '@/types/rewards';
+import { optimizeSpread, OptimalSpreadResult, SpreadOptimizationOptions } from './dynamic-spread-optimizer';
 
 /**
  * Calculate optimal order placement to maximize Q_min
@@ -188,4 +189,171 @@ export function allocateCapital(
       placement: newPlacement,
     };
   });
+}
+
+/**
+ * NEW: Optimize order placement with dynamic spread (considers volatility and fill risk)
+ *
+ * This is the improved version that uses:
+ * - Volatility analysis
+ * - Fill probability calculation
+ * - Expected value optimization
+ *
+ * @param capital - Total capital to deploy
+ * @param market - Market configuration
+ * @param conditionId - Market condition ID for price history
+ * @param currentCompetitionQMin - Total Q_min of other LPs
+ * @param options - Optimization options
+ * @returns Optimal placement with risk metrics
+ */
+export async function optimizeOrderPlacementDynamic(
+  capital: number,
+  market: Market,
+  conditionId: string,
+  currentCompetitionQMin: number,
+  options: SpreadOptimizationOptions = {}
+): Promise<OptimalPlacement & {
+  fillProbability: number;
+  expectedValue: number;
+  riskAdjustedReturn: number;
+  volatilityScore: number;
+  optimalSpreadRatio: number;
+}> {
+  // Use dynamic spread optimizer
+  const result = await optimizeSpread(
+    market,
+    capital,
+    conditionId,
+    currentCompetitionQMin,
+    options
+  );
+
+  // Convert to OptimalPlacement format
+  return {
+    buyOrder: {
+      price: result.recommendedOrders[0].price,
+      size: result.recommendedOrders[0].size,
+    },
+    sellOrder: {
+      price: result.recommendedOrders[1].price,
+      size: result.recommendedOrders[1].size,
+    },
+    expectedQScore: calculateQScore(result.recommendedOrders, market),
+    expectedDailyReward: result.expectedDailyReward,
+    capitalEfficiency: result.expectedDailyReward / capital,
+    fillProbability: result.fillProbability,
+    expectedValue: result.expectedValue,
+    riskAdjustedReturn: result.riskAdjustedReturn,
+    volatilityScore: result.volatilityMetrics.volatilityScore,
+    optimalSpreadRatio: result.optimalSpreadRatio,
+  };
+}
+
+/**
+ * NEW: Compare markets using dynamic spread optimization
+ *
+ * This version considers fill risk and volatility when ranking markets
+ */
+export async function compareMarketsDynamic(
+  capital: number,
+  markets: Array<{
+    market: Market;
+    conditionId: string;
+    competitionQMin: number;
+  }>,
+  options: SpreadOptimizationOptions = {}
+): Promise<Array<{
+  market: Market;
+  placement: OptimalPlacement & {
+    fillProbability: number;
+    expectedValue: number;
+    riskAdjustedReturn: number;
+    volatilityScore: number;
+  };
+  score: number; // Combined score for ranking
+}>> {
+  const results = await Promise.all(
+    markets.map(async ({ market, conditionId, competitionQMin }) => {
+      const placement = await optimizeOrderPlacementDynamic(
+        capital,
+        market,
+        conditionId,
+        competitionQMin,
+        options
+      );
+
+      // Calculate combined score (prioritize risk-adjusted return)
+      const score = placement.riskAdjustedReturn;
+
+      return {
+        market,
+        placement,
+        score,
+      };
+    })
+  );
+
+  // Sort by score (descending)
+  return results.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * NEW: Allocate capital across markets using dynamic optimization
+ *
+ * This version uses fill risk and expected value to allocate capital optimally
+ */
+export async function allocateCapitalDynamic(
+  totalCapital: number,
+  markets: Array<{
+    market: Market;
+    conditionId: string;
+    competitionQMin: number;
+  }>,
+  maxMarketsToUse: number = 3,
+  options: SpreadOptimizationOptions = {}
+): Promise<Array<{
+  market: Market;
+  allocation: number;
+  placement: OptimalPlacement & {
+    fillProbability: number;
+    expectedValue: number;
+    riskAdjustedReturn: number;
+  };
+}>> {
+  // Get best markets by risk-adjusted return
+  const rankedMarkets = await compareMarketsDynamic(totalCapital, markets, options);
+  const selectedMarkets = rankedMarkets.slice(0, maxMarketsToUse);
+
+  // Allocate proportionally to risk-adjusted return
+  const totalScore = selectedMarkets.reduce((sum, m) => sum + m.score, 0);
+
+  const allocations = await Promise.all(
+    selectedMarkets.map(async ({ market, score }) => {
+      const allocationPercent = score / totalScore;
+      const allocation = totalCapital * allocationPercent;
+
+      // Get corresponding conditionId and competition
+      const marketData = markets.find(m => m.market.id === market.id);
+      if (!marketData) {
+        throw new Error(`Market ${market.id} not found`);
+      }
+
+      // Recalculate placement with allocated capital
+      const newPlacement = await optimizeOrderPlacementDynamic(
+        allocation,
+        market,
+        marketData.conditionId,
+        marketData.competitionQMin,
+        options
+      );
+
+      return {
+        market,
+        allocation,
+        placement: newPlacement,
+      };
+    })
+  );
+
+  return allocations;
 }

@@ -31,6 +31,13 @@ model User {
   // If not set, walletAddress is used (for direct EOA wallets)
   funderAddress String?
 
+  // Builder Program Credentials (for order attribution)
+  // Get these from your Polymarket Builder Profile
+  builderApiKey        String?
+  builderApiSecret     String?
+  builderApiPassphrase String?
+  builderCreatedAt     DateTime?
+
   // Relations
   positions     Position[]
   payouts       Payout[]

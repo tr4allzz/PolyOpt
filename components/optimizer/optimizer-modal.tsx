@@ -5,8 +5,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { OptimizationResult } from './optimization-result'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Info } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface OptimizerModalProps {
   marketId: string
@@ -16,6 +18,8 @@ interface OptimizerModalProps {
 export function OptimizerModal({ marketId, marketQuestion }: OptimizerModalProps) {
   const [open, setOpen] = useState(false)
   const [capital, setCapital] = useState('')
+  const [riskTolerance, setRiskTolerance] = useState<'low' | 'medium' | 'high'>('medium')
+  const [timeHorizon, setTimeHorizon] = useState('30')
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 
@@ -28,7 +32,9 @@ export function OptimizerModal({ marketId, marketQuestion }: OptimizerModalProps
         body: JSON.stringify({
           capital: parseFloat(capital),
           marketId,
-          strategy: 'balanced',
+          strategy: 'dynamic', // NEW: Use dynamic optimization
+          riskTolerance,
+          timeHorizon: parseInt(timeHorizon),
         }),
       })
 
@@ -79,6 +85,67 @@ export function OptimizerModal({ marketId, marketQuestion }: OptimizerModalProps
               />
             </div>
 
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="riskTolerance">Risk Tolerance</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">
+                        <strong>Low:</strong> Wide spreads, less fill risk, lower rewards<br />
+                        <strong>Medium:</strong> Balanced approach (recommended)<br />
+                        <strong>High:</strong> Tight spreads, higher rewards, more risk
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Select value={riskTolerance} onValueChange={(v: any) => setRiskTolerance(v)}>
+                <SelectTrigger id="riskTolerance">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">
+                    <div className="flex flex-col items-start">
+                      <span>Conservative</span>
+                      <span className="text-xs text-muted-foreground">Wide spreads, low fill risk</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="medium">
+                    <div className="flex flex-col items-start">
+                      <span>Balanced (Recommended)</span>
+                      <span className="text-xs text-muted-foreground">Optimizes risk vs reward</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="high">
+                    <div className="flex flex-col items-start">
+                      <span>Aggressive</span>
+                      <span className="text-xs text-muted-foreground">Tight spreads, max rewards</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="timeHorizon">Time Horizon</Label>
+              <Select value={timeHorizon} onValueChange={setTimeHorizon}>
+                <SelectTrigger id="timeHorizon">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 days</SelectItem>
+                  <SelectItem value="14">14 days</SelectItem>
+                  <SelectItem value="30">30 days (default)</SelectItem>
+                  <SelectItem value="60">60 days</SelectItem>
+                  <SelectItem value="90">90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <Button
               onClick={handleOptimize}
               disabled={!capital || parseFloat(capital) <= 0 || loading}
@@ -88,7 +155,7 @@ export function OptimizerModal({ marketId, marketQuestion }: OptimizerModalProps
             </Button>
           </div>
         ) : (
-          <OptimizationResult result={result} />
+          <OptimizationResult result={result} onBack={() => setResult(null)} />
         )}
       </DialogContent>
     </Dialog>

@@ -15,6 +15,15 @@ export interface MarketOpportunity {
   roi: number; // Annualized ROI %
   competitionLevel: 'Low' | 'Medium' | 'High';
   recommendedCapital: number; // Minimum to be competitive
+  dynamicMetrics?: {
+    fillProbability: number;
+    fillRiskLevel: 'Low' | 'Medium' | 'High' | 'Very High';
+    volatilityScore: number;
+    volatilityLevel: string;
+    expectedValue: number;
+    riskAdjustedReturn: number;
+    optimalSpreadRatio: number;
+  };
 }
 
 /**

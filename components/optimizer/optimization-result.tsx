@@ -1,18 +1,27 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatUSD } from '@/lib/polymarket/utils'
-import { ArrowRight, TrendingUp } from 'lucide-react'
+import { ArrowRight, TrendingUp, AlertTriangle, Activity, Target, ChevronLeft } from 'lucide-react'
 
 interface OptimizationResultProps {
   result: {
     capital: number
+    strategy?: string
     optimalPlacement: {
       buyOrder: { price: number; size: number }
       sellOrder: { price: number; size: number }
       expectedQScore: { qOne: number; qTwo: number; qMin: number }
       expectedDailyReward: number
       capitalEfficiency: number
+      fillProbability?: number
+      expectedValue?: number
+      riskAdjustedReturn?: number
+      volatilityScore?: number
+      optimalSpreadRatio?: number
     }
     metrics: {
       expectedDailyReward: number
@@ -23,12 +32,110 @@ interface OptimizationResultProps {
       buyOrder: { price: string; size: number; cost: string }
       sellOrder: { price: string; size: number; cost: string }
     }
+    riskMetrics?: {
+      fillProbability: number
+      fillRiskLevel: 'Low' | 'Medium' | 'High' | 'Very High'
+      volatilityScore: number
+      volatilityLevel: string
+      expectedValue: number
+      riskAdjustedReturn: number
+      optimalSpreadRatio: number
+    }
+    warnings?: string[]
+  }
+  onBack?: () => void
+}
+
+function getRiskBadgeVariant(riskLevel: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (riskLevel) {
+    case 'Low': return 'default'
+    case 'Medium': return 'secondary'
+    case 'High': return 'destructive'
+    case 'Very High': return 'destructive'
+    default: return 'outline'
   }
 }
 
-export function OptimizationResult({ result }: OptimizationResultProps) {
+export function OptimizationResult({ result, onBack }: OptimizationResultProps) {
+  const hasRiskMetrics = !!result.riskMetrics
+
   return (
     <div className="space-y-4">
+      {/* Back button */}
+      {onBack && (
+        <Button variant="ghost" size="sm" onClick={onBack} className="mb-2">
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+      )}
+
+      {/* Risk Warnings */}
+      {result.warnings && result.warnings.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Risk Warning</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc list-inside space-y-1">
+              {result.warnings.map((warning, i) => (
+                <li key={i} className="text-sm">{warning}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Risk Metrics Card - NEW */}
+      {hasRiskMetrics && result.riskMetrics && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-600" />
+              Risk Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Fill Risk</p>
+              <div className="flex items-center gap-2">
+                <Badge variant={getRiskBadgeVariant(result.riskMetrics.fillRiskLevel)}>
+                  {result.riskMetrics.fillRiskLevel}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  ({(result.riskMetrics.fillProbability * 100).toFixed(1)}%)
+                </span>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Market Volatility</p>
+              <Badge variant="outline">
+                {result.riskMetrics.volatilityLevel}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Expected Value (30d)</p>
+              <p className="text-lg font-bold text-blue-600">
+                {formatUSD(result.riskMetrics.expectedValue)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Risk-Adjusted Return</p>
+              <p className="text-lg font-bold">
+                {(result.riskMetrics.riskAdjustedReturn * 100).toFixed(2)}%
+              </p>
+            </div>
+            <div className="col-span-2 pt-2 border-t">
+              <p className="text-xs text-muted-foreground mb-1">Optimal Spread</p>
+              <p className="text-sm font-medium">
+                {(result.riskMetrics.optimalSpreadRatio * 100).toFixed(0)}% of max spread
+                <span className="text-xs text-muted-foreground ml-2">
+                  (dynamically optimized)
+                </span>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Expected Returns</CardTitle>
