@@ -13,7 +13,6 @@ export function Header() {
   const pathname = usePathname()
 
   const navLinks = [
-    { href: '/markets', label: 'Markets' },
     { href: '/discover', label: 'Discover' },
     { href: '/portfolio', label: 'Portfolio' },
     { href: '/leaderboard', label: 'Leaderboard' },

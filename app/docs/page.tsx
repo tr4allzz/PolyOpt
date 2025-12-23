@@ -125,10 +125,10 @@ export default function DocsPage() {
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold mb-3">2. Browse Markets</h3>
+                    <h3 className="text-xl font-semibold mb-3">2. Discover & Trade</h3>
                     <p className="text-muted-foreground mb-3">
-                      Navigate to the <Link href="/markets" className="text-primary hover:underline">Markets</Link> page
-                      to see all active markets with liquidity rewards. Markets are sorted by daily reward pool size.
+                      Navigate to the <Link href="/discover" className="text-primary hover:underline">Discover</Link> page
+                      to see all active markets with liquidity rewards. Enter your capital, find opportunities, and place optimized orders.
                     </p>
                   </div>
 

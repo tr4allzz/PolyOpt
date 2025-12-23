@@ -26,9 +26,9 @@ export default function Home() {
                   Discover Opportunities
                 </Button>
               </Link>
-              <Link href="/markets">
+              <Link href="/portfolio">
                 <Button size="lg" variant="outline">
-                  Browse Markets
+                  View Portfolio
                 </Button>
               </Link>
             </div>
