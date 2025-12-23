@@ -21,8 +21,11 @@ interface MarketCardProps {
     liquidity: number
     endDate: Date | string
     active: boolean
+    clobTokenIds?: string[]
+    conditionId?: string
   }
   compact?: boolean
+  onClick?: () => void
 }
 
 // Get reward tier based on daily reward amount
@@ -53,14 +56,25 @@ function getTimeInfo(endDate: Date | string): { text: string; urgent: boolean; p
   return { text: format(end, 'MMM d'), urgent: false, progress: 10 }
 }
 
-export function MarketCard({ market, compact = false }: MarketCardProps) {
+export function MarketCard({ market, compact = false, onClick }: MarketCardProps) {
   const rewardTier = getRewardTier(market.rewardPool)
   const estimatedAPY = estimateAPY(market.rewardPool, market.liquidity)
   const timeInfo = getTimeInfo(market.endDate)
 
+  // Wrapper component - use button if onClick provided, otherwise Link
+  const Wrapper = onClick
+    ? ({ children, className }: { children: React.ReactNode; className?: string }) => (
+        <button onClick={onClick} className={`w-full text-left ${className || ''}`}>
+          {children}
+        </button>
+      )
+    : ({ children }: { children: React.ReactNode }) => (
+        <Link href="/discover">{children}</Link>
+      )
+
   if (compact) {
     return (
-      <Link href={`/markets/${market.id}`}>
+      <Wrapper>
         <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
           {/* Reward amount - prominent */}
           <div className="flex-shrink-0 w-20 text-center">
@@ -95,7 +109,7 @@ export function MarketCard({ market, compact = false }: MarketCardProps) {
 
           <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
         </div>
-      </Link>
+      </Wrapper>
     )
   }
 
@@ -186,12 +200,22 @@ export function MarketCard({ market, compact = false }: MarketCardProps) {
         </div>
 
         {/* Action button - always at bottom */}
-        <Link href={`/markets/${market.id}`} className="block">
-          <Button className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-            Calculate Rewards
+        {onClick ? (
+          <Button
+            onClick={onClick}
+            className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+          >
+            View & Trade
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
-        </Link>
+        ) : (
+          <Link href="/discover" className="block">
+            <Button className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+              View & Trade
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </Link>
+        )}
       </CardContent>
     </Card>
   )

@@ -11,11 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatUSD } from '@/lib/polymarket/utils'
-import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart, ArrowRight, Calendar, Zap } from 'lucide-react'
+import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart, ArrowRight, Calendar } from 'lucide-react'
 import { RewardsCalendar } from '@/components/portfolio/rewards-calendar'
 import { StreakTracker } from '@/components/portfolio/streak-tracker'
 import { ConnectButton } from '@/components/wallet/connect-button'
-import { OrderPlacementPanel } from '@/components/trading/order-placement-panel'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -246,7 +245,7 @@ export default function PortfolioPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
+            <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
@@ -268,10 +267,6 @@ export default function PortfolioPage() {
               <TabsTrigger value="positions" className="flex items-center gap-2">
                 <PieChart className="h-4 w-4" />
                 <span className="hidden sm:inline">Positions</span>
-              </TabsTrigger>
-              <TabsTrigger value="trading" className="flex items-center gap-2">
-                <Zap className="h-4 w-4" />
-                <span className="hidden sm:inline">Trading</span>
               </TabsTrigger>
             </TabsList>
 
@@ -388,7 +383,7 @@ export default function PortfolioPage() {
                       <div>
                         <p className="font-medium mb-1">No rewards found</p>
                         <p className="text-sm text-muted-foreground mb-2">
-                          No market maker rewards found for this wallet address
+                          Place limit orders on markets to start earning maker rewards
                         </p>
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4 text-left max-w-md mx-auto">
                           <p className="text-sm font-medium text-blue-900 mb-2">
@@ -402,54 +397,48 @@ export default function PortfolioPage() {
                           </p>
                         </div>
                       </div>
-                      <Button asChild variant="outline">
-                        <a
-                          href="https://polymarket.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Go to Polymarket
-                          <ExternalLink className="ml-2 h-4 w-4" />
-                        </a>
-                      </Button>
+                      <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                        <Button asChild>
+                          <Link href="/discover">
+                            <TrendingUp className="mr-2 h-4 w-4" />
+                            Start Earning
+                          </Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <a
+                            href="https://polymarket.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Go to Polymarket
+                            <ExternalLink className="ml-2 h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
               {/* Quick Actions */}
-              <Card>
+              <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-transparent">
                 <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
+                  <CardTitle>Ready to Trade?</CardTitle>
                   <CardDescription>
-                    Explore markets and optimize your strategy
+                    Find the best opportunities and place optimized orders
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Link href="/discover" className="block">
-                      <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
-                        <CardHeader>
-                          <TrendingUp className="h-8 w-8 mb-2" />
-                          <CardTitle className="text-lg">Discover Markets</CardTitle>
-                          <CardDescription>
-                            Find the best opportunities for your capital
-                          </CardDescription>
-                        </CardHeader>
-                      </Card>
-                    </Link>
-                    <Link href="/optimize" className="block">
-                      <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
-                        <CardHeader>
-                          <DollarSign className="h-8 w-8 mb-2" />
-                          <CardTitle className="text-lg">Optimize Strategy</CardTitle>
-                          <CardDescription>
-                            Get recommendations to maximize rewards
-                          </CardDescription>
-                        </CardHeader>
-                      </Card>
-                    </Link>
-                  </div>
+                  <Link href="/discover" className="block">
+                    <Button size="lg" className="w-full">
+                      <TrendingUp className="h-5 w-5 mr-2" />
+                      Discover & Trade
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </Link>
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    Find markets, optimize strategy, and place orders - all in one place
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -507,21 +496,29 @@ export default function PortfolioPage() {
                     <div className="text-center py-8 space-y-4">
                       <DollarSign className="h-12 w-12 mx-auto text-muted-foreground" />
                       <div>
-                        <p className="font-medium mb-1">No rewards found</p>
+                        <p className="font-medium mb-1">No rewards yet</p>
                         <p className="text-sm text-muted-foreground mb-2">
-                          Start placing limit orders on markets to earn rewards
+                          Place optimized orders to start earning maker rewards
                         </p>
                       </div>
-                      <Button asChild variant="outline">
-                        <a
-                          href="https://polymarket.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Go to Polymarket
-                          <ExternalLink className="ml-2 h-4 w-4" />
-                        </a>
-                      </Button>
+                      <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                        <Button asChild>
+                          <Link href="/discover">
+                            <TrendingUp className="mr-2 h-4 w-4" />
+                            Discover Markets
+                          </Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <a
+                            href="https://polymarket.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Go to Polymarket
+                            <ExternalLink className="ml-2 h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -664,18 +661,26 @@ export default function PortfolioPage() {
                     <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <p className="font-medium mb-2">No Open Orders</p>
                     <p className="text-sm text-muted-foreground mb-4">
-                      You don't have any limit orders on the book. Place limit orders on Polymarket to earn maker rewards.
+                      Place optimized limit orders to start earning maker rewards.
                     </p>
-                    <Button asChild variant="outline">
-                      <a
-                        href="https://polymarket.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Go to Polymarket
-                        <ExternalLink className="ml-2 h-4 w-4" />
-                      </a>
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <Button asChild>
+                        <Link href="/discover">
+                          <TrendingUp className="mr-2 h-4 w-4" />
+                          Place Optimized Orders
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline">
+                        <a
+                          href="https://polymarket.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Go to Polymarket
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -776,18 +781,26 @@ export default function PortfolioPage() {
                     <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <p className="font-medium mb-2">No Active Positions</p>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Start trading on Polymarket to see your positions here
+                      Find the best markets and place optimized orders to start earning
                     </p>
-                    <Button asChild variant="outline">
-                      <a
-                        href="https://polymarket.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Go to Polymarket
-                        <ExternalLink className="ml-2 h-4 w-4" />
-                      </a>
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <Button asChild>
+                        <Link href="/discover">
+                          <TrendingUp className="mr-2 h-4 w-4" />
+                          Discover Markets
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline">
+                        <a
+                          href="https://polymarket.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Go to Polymarket
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -816,12 +829,9 @@ export default function PortfolioPage() {
                           className="flex items-center justify-between py-3 border-b last:border-0"
                         >
                           <div className="space-y-1 flex-1">
-                            <Link
-                              href={`/markets/${position.marketId}`}
-                              className="font-medium text-sm hover:underline"
-                            >
+                            <p className="font-medium text-sm">
                               {position.market.question}
-                            </Link>
+                            </p>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
                               <span>{position.orderCount} order{position.orderCount !== 1 ? 's' : ''}</span>
                               <span>•</span>
@@ -836,7 +846,7 @@ export default function PortfolioPage() {
                               )}
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex items-center gap-2">
                             {position.market.active ? (
                               <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">
                                 Active
@@ -846,6 +856,11 @@ export default function PortfolioPage() {
                                 Ended
                               </span>
                             )}
+                            <Link href="/discover">
+                              <Button variant="ghost" size="sm">
+                                <ArrowRight className="h-4 w-4" />
+                              </Button>
+                            </Link>
                           </div>
                         </div>
                       ))}
@@ -867,19 +882,6 @@ export default function PortfolioPage() {
                   </CardContent>
                 </Card>
               )}
-            </TabsContent>
-
-            {/* Trading Tab */}
-            <TabsContent value="trading" className="space-y-6">
-              <OrderPlacementPanel
-                walletAddress={address || ''}
-                onOrderPlaced={() => {
-                  toast.success('Order placed!', {
-                    description: 'Your order has been submitted to Polymarket.',
-                  });
-                  refetch?.();
-                }}
-              />
             </TabsContent>
 
           </Tabs>
