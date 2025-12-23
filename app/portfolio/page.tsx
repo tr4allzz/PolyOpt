@@ -11,13 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatUSD } from '@/lib/polymarket/utils'
-import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart, ArrowRight, Calendar, Settings, Zap } from 'lucide-react'
+import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart, ArrowRight, Calendar, Zap } from 'lucide-react'
 import { RewardsCalendar } from '@/components/portfolio/rewards-calendar'
 import { StreakTracker } from '@/components/portfolio/streak-tracker'
 import { ConnectButton } from '@/components/wallet/connect-button'
-import { BuilderCredentialsForm } from '@/components/settings/builder-credentials-form'
 import { OrderPlacementPanel } from '@/components/trading/order-placement-panel'
-import { GaslessControls } from '@/components/trading/gasless-controls'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -248,7 +246,7 @@ export default function PortfolioPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6 lg:w-[720px]">
+            <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
@@ -274,10 +272,6 @@ export default function PortfolioPage() {
               <TabsTrigger value="trading" className="flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 <span className="hidden sm:inline">Trading</span>
-              </TabsTrigger>
-              <TabsTrigger value="builder" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Builder</span>
               </TabsTrigger>
             </TabsList>
 
@@ -877,24 +871,17 @@ export default function PortfolioPage() {
 
             {/* Trading Tab */}
             <TabsContent value="trading" className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <OrderPlacementPanel
-                  walletAddress={address || ''}
-                  onOrderPlaced={() => {
-                    toast.success('Order placed!', {
-                      description: 'Your order has been submitted to Polymarket.',
-                    });
-                    refetch?.();
-                  }}
-                />
-                <GaslessControls walletAddress={address || ''} />
-              </div>
+              <OrderPlacementPanel
+                walletAddress={address || ''}
+                onOrderPlaced={() => {
+                  toast.success('Order placed!', {
+                    description: 'Your order has been submitted to Polymarket.',
+                  });
+                  refetch?.();
+                }}
+              />
             </TabsContent>
 
-            {/* Builder Tab */}
-            <TabsContent value="builder" className="space-y-6">
-              <BuilderCredentialsForm walletAddress={address || ''} />
-            </TabsContent>
           </Tabs>
         </div>
       </main>
