@@ -223,38 +223,6 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Technology */}
-        <section id="technology" className="py-16 px-4 scroll-mt-24">
-          <div className="container max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold mb-6">Built With</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <div className="p-4 rounded-lg border bg-card hover:bg-accent transition-colors">
-                <p className="font-semibold text-foreground">Frontend</p>
-                <p className="text-sm text-muted-foreground">Next.js 14 + TypeScript</p>
-              </div>
-              <div className="p-4 rounded-lg border bg-card hover:bg-accent transition-colors">
-                <p className="font-semibold text-foreground">Styling</p>
-                <p className="text-sm text-muted-foreground">TailwindCSS + shadcn/ui</p>
-              </div>
-              <div className="p-4 rounded-lg border bg-card hover:bg-accent transition-colors">
-                <p className="font-semibold text-foreground">Database</p>
-                <p className="text-sm text-muted-foreground">PostgreSQL + Prisma</p>
-              </div>
-              <div className="p-4 rounded-lg border bg-card hover:bg-accent transition-colors">
-                <p className="font-semibold text-foreground">Blockchain</p>
-                <p className="text-sm text-muted-foreground">wagmi + viem (Polygon)</p>
-              </div>
-              <div className="p-4 rounded-lg border bg-card hover:bg-accent transition-colors">
-                <p className="font-semibold text-foreground">APIs</p>
-                <p className="text-sm text-muted-foreground">Polymarket CLOB + Dune</p>
-              </div>
-              <div className="p-4 rounded-lg border bg-card hover:bg-accent transition-colors">
-                <p className="font-semibold text-foreground">Hosting</p>
-                <p className="text-sm text-muted-foreground">Vercel</p>
-              </div>
-            </div>
-          </div>
-        </section>
       </main>
 
       <Footer />

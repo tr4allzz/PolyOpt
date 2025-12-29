@@ -6,12 +6,15 @@ import { Footer } from '@/components/layout/footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { InfoIcon, AlertCircle, BookOpen, Zap, Target, HelpCircle, ChevronRight } from 'lucide-react'
+import { InfoIcon, AlertCircle, BookOpen, Zap, Target, HelpCircle, ChevronRight, Wifi, BarChart3, PenTool } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 const sections = [
   { id: 'getting-started', label: 'Getting Started', icon: BookOpen },
+  { id: 'calm-markets', label: 'Calm Markets', icon: BarChart3 },
+  { id: 'real-time', label: 'Real-Time Data', icon: Wifi },
+  { id: 'order-signing', label: 'Order Signing', icon: PenTool },
   { id: 'q-scores', label: 'Q-Scores', icon: Target },
   { id: 'strategy', label: 'Strategy Guide', icon: Zap },
   { id: 'faq', label: 'FAQ', icon: HelpCircle },
@@ -152,6 +155,294 @@ export default function DocsPage() {
                       to find the best opportunities based on reward pool size, competition level, and capital efficiency.
                     </p>
                   </div>
+                </div>
+              </section>
+
+              {/* Calm Markets */}
+              <section id="calm-markets" className="scroll-mt-24">
+                <h2 className="text-3xl font-bold mb-6">Calm Markets</h2>
+
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Finding Low-Competition Markets</CardTitle>
+                      <CardDescription>Discover markets that are easier to trade in</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-muted-foreground">
+                        The <Link href="/discover" className="text-primary hover:underline">Discover</Link> page includes
+                        a "Calm" tab that shows markets with lower activity and less competition. These markets are
+                        ideal for placing orders that are less likely to be filled quickly.
+                      </p>
+                      <p className="text-muted-foreground">
+                        Each calm market displays a <strong>stability score</strong> (0-100) based on three factors:
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Stability Score Components</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-4">
+                        <div>
+                          <p className="font-semibold mb-1">1. Volume Score (35% weight)</p>
+                          <p className="text-sm text-muted-foreground">
+                            Lower 24-hour trading volume indicates less activity and competition. Markets with
+                            under $5k daily volume score highest, while markets with $5M+ volume score lowest.
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">2. Spread Score (35% weight)</p>
+                          <p className="text-sm text-muted-foreground">
+                            Wider bid-ask spreads indicate less competition from other liquidity providers.
+                            Markets with 5%+ spreads are considered "calm" while tight 1% spreads indicate
+                            heavy competition.
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">3. Depth Score (30% weight)</p>
+                          <p className="text-sm text-muted-foreground">
+                            Moderate orderbook depth ($100-$1,000) is ideal. Very shallow books are risky,
+                            while very deep books indicate many competing LPs.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-secondary/50 p-4 rounded-lg font-mono text-sm">
+                        Stability = (Volume × 0.35) + (Spread × 0.35) + (Depth × 0.30)
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Using Calm Markets Effectively</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="font-semibold mb-2">Best Practices:</p>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
+                          <li>Look for stability scores above 70 for optimal conditions</li>
+                          <li>Balance stability with reward pool size - very calm markets may have lower rewards</li>
+                          <li>Monitor the actual spread percentage shown to ensure it meets your needs</li>
+                          <li>Check daily volume to understand how active the market really is</li>
+                        </ul>
+                      </div>
+                      <Alert>
+                        <InfoIcon className="h-4 w-4" />
+                        <AlertDescription>
+                          Calm markets refresh when you switch to the tab. Data is fetched directly from
+                          the Polymarket orderbook API.
+                        </AlertDescription>
+                      </Alert>
+                    </CardContent>
+                  </Card>
+                </div>
+              </section>
+
+              {/* Real-Time Data */}
+              <section id="real-time" className="scroll-mt-24">
+                <h2 className="text-3xl font-bold mb-6">Real-Time Data</h2>
+
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Live Orderbook Updates</CardTitle>
+                      <CardDescription>WebSocket-powered real-time market data</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-muted-foreground">
+                        When you open a market's detail drawer, the app connects to Polymarket's WebSocket
+                        server to receive live orderbook updates. You'll see:
+                      </p>
+                      <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
+                        <li><strong>Live midpoint:</strong> Updated in real-time as orders change</li>
+                        <li><strong>Current spread:</strong> Shows the actual bid-ask spread</li>
+                        <li><strong>Trade notifications:</strong> See when trades occur on the market</li>
+                        <li><strong>Connection status:</strong> A WiFi icon indicates live vs static data</li>
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Connection Status</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-500 rounded-full text-sm">
+                          <Wifi className="h-4 w-4" />
+                          <span>Live</span>
+                        </div>
+                        <span className="text-muted-foreground">- Connected to real-time feed</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted text-muted-foreground rounded-full text-sm">
+                          <Wifi className="h-4 w-4" />
+                          <span>Static</span>
+                        </div>
+                        <span className="text-muted-foreground">- Using cached data</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-4">
+                        The connection automatically reconnects if disconnected. Data falls back to
+                        the most recent cached values while reconnecting.
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>WebSocket Data Types</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        <div>
+                          <p className="font-semibold mb-1">Book Snapshots</p>
+                          <p className="text-sm text-muted-foreground">
+                            Full orderbook state sent when you first connect. Contains all current
+                            bids and asks with their prices and sizes.
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">Price Changes</p>
+                          <p className="text-sm text-muted-foreground">
+                            Incremental updates when orders are added, modified, or removed. These
+                            keep the orderbook in sync without resending everything.
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">Last Trade Price</p>
+                          <p className="text-sm text-muted-foreground">
+                            Notifications when trades execute on the market. Useful for monitoring
+                            activity and understanding current market interest.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </section>
+
+              {/* Order Signing */}
+              <section id="order-signing" className="scroll-mt-24">
+                <h2 className="text-3xl font-bold mb-6">Order Signing</h2>
+
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Direct Order Placement</CardTitle>
+                      <CardDescription>Sign and submit orders with MetaMask</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-muted-foreground">
+                        You can place orders directly from the app using your MetaMask wallet. The process
+                        uses EIP-712 typed signatures - the same method Polymarket uses for their web app.
+                      </p>
+                      <Alert>
+                        <InfoIcon className="h-4 w-4" />
+                        <AlertDescription>
+                          Orders are signed locally in your browser. Your private key never leaves MetaMask.
+                          We only submit the signed order to Polymarket's API.
+                        </AlertDescription>
+                      </Alert>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>How Order Signing Works</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        <div>
+                          <p className="font-semibold mb-1">1. Order Construction</p>
+                          <p className="text-sm text-muted-foreground">
+                            When you click "Place Order", we construct an EIP-712 typed data structure
+                            containing the order details: token ID, price, size, side, and expiration.
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">2. MetaMask Signature</p>
+                          <p className="text-sm text-muted-foreground">
+                            MetaMask shows you the order details for review. You sign with your
+                            private key to authorize the order.
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">3. API Submission</p>
+                          <p className="text-sm text-muted-foreground">
+                            The signed order is sent to Polymarket's CLOB API. If accepted, it appears
+                            in the orderbook immediately.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-secondary/50 p-4 rounded-lg font-mono text-xs overflow-x-auto">
+                        <pre>{`{
+  "domain": {
+    "name": "Polymarket CTF Exchange",
+    "chainId": 137,
+    "verifyingContract": "0x..."
+  },
+  "Order": {
+    "salt", "maker", "signer", "taker",
+    "tokenId", "makerAmount", "takerAmount",
+    "side", "expiration", "nonce", "feeRateBps"
+  }
+}`}</pre>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>NegRisk vs Standard Markets</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-muted-foreground">
+                        Polymarket has two types of markets that use different exchange contracts:
+                      </p>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="font-semibold mb-1">Standard Markets</p>
+                          <p className="text-sm text-muted-foreground">
+                            Simple yes/no binary markets. These use the CTF Exchange contract.
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">NegRisk Markets</p>
+                          <p className="text-sm text-muted-foreground">
+                            Multi-outcome markets (e.g., "Who will win the election?"). These use
+                            the NegRisk CTF Exchange contract with different signing parameters.
+                          </p>
+                        </div>
+                      </div>
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          The app automatically detects the market type and uses the correct
+                          exchange contract for signing. No action needed on your part.
+                        </AlertDescription>
+                      </Alert>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Troubleshooting Orders</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="font-semibold mb-2">Common Issues:</p>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
+                          <li><strong>Signature rejected:</strong> Make sure you're on Polygon network in MetaMask</li>
+                          <li><strong>Order rejected:</strong> Check that price is within valid range (0.01 - 0.99)</li>
+                          <li><strong>Minimum size error:</strong> Orders must meet the market's minimum size (usually 100 shares)</li>
+                          <li><strong>Nonce error:</strong> Wait a moment and try again - nonces are fetched from the API</li>
+                        </ul>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </section>
 
