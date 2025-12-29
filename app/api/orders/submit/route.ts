@@ -41,10 +41,21 @@ function createL2AuthHeaders(
     message += body;
   }
 
+  console.log('🔐 L2 Auth Debug:');
+  console.log('   walletAddress:', walletAddress);
+  console.log('   apiKey:', apiKey);
+  console.log('   secret (first 10):', secret?.substring(0, 10) + '...');
+  console.log('   passphrase:', passphrase);
+  console.log('   timestamp:', timestamp);
+  console.log('   method:', method);
+  console.log('   path:', path);
+
   const base64Secret = Buffer.from(secret, 'base64');
   const hmac = crypto.createHmac('sha256', base64Secret);
   const sig = hmac.update(message).digest('base64');
   const sigUrlSafe = sig.replace(/\+/g, '-').replace(/\//g, '_');
+
+  console.log('   signature:', sigUrlSafe.substring(0, 20) + '...');
 
   return {
     POLY_ADDRESS: walletAddress.toLowerCase(),
