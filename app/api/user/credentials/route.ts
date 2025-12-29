@@ -71,26 +71,54 @@ export const POST = requireAuth(async (request: NextRequest, auth) => {
 /**
  * GET /api/user/credentials
  * Check if user has API credentials saved
- * Requires authentication - wallet signature verification
+ * Supports both authenticated requests and simple wallet query param
  */
-export const GET = requireAuth(async (request: NextRequest, auth) => {
-  const walletAddress = auth.walletAddress;
+export async function GET(request: NextRequest) {
+  // Support simple wallet query param for fetching funder address
+  const { searchParams } = new URL(request.url);
+  const walletParam = searchParams.get('wallet');
 
-  const user = await prisma.user.findUnique({
-    where: { walletAddress },
-    select: {
-      apiKey: true,
-      apiCreatedAt: true,
-    },
-  });
+  if (walletParam) {
+    const user = await prisma.user.findUnique({
+      where: { walletAddress: walletParam.toLowerCase() },
+      select: {
+        apiKey: true,
+        funderAddress: true,
+        apiCreatedAt: true,
+        encryptedPrivateKey: true,
+      },
+    });
 
-  const hasCredentials = !!(user && user.apiKey);
+    return NextResponse.json({
+      hasCredentials: !!(user && user.apiKey),
+      hasStoredKey: !!(user && user.encryptedPrivateKey),
+      funderAddress: user?.funderAddress || null,
+      createdAt: user?.apiCreatedAt || null,
+    });
+  }
 
-  return NextResponse.json({
-    hasCredentials,
-    createdAt: user?.apiCreatedAt || null,
-  });
-});
+  // Fall back to authenticated request
+  return requireAuth(async (req: NextRequest, auth) => {
+    const walletAddress = auth.walletAddress;
+
+    const user = await prisma.user.findUnique({
+      where: { walletAddress },
+      select: {
+        apiKey: true,
+        funderAddress: true,
+        apiCreatedAt: true,
+      },
+    });
+
+    const hasCredentials = !!(user && user.apiKey);
+
+    return NextResponse.json({
+      hasCredentials,
+      funderAddress: user?.funderAddress || null,
+      createdAt: user?.apiCreatedAt || null,
+    });
+  })(request);
+}
 
 /**
  * DELETE /api/user/credentials

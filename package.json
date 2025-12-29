@@ -31,6 +31,7 @@
   },
   "homepage": "https://github.com/tr4allzz/PolyOpt#readme",
   "dependencies": {
+    "@polymarket/builder-signing-sdk": "^0.0.8",
     "@polymarket/clob-client": "^4.22.8",
     "@prisma/client": "^6.18.0",
     "@radix-ui/react-dialog": "^1.1.15",

@@ -21,11 +21,15 @@ model User {
   stripeId      String?  @unique
 
   // Polymarket API Credentials (L2 Authentication)
-  // TODO: Encrypt these in production
+  // All credentials are encrypted
   apiKey        String?
   apiSecret     String?
   apiPassphrase String?
   apiCreatedAt  DateTime?
+
+  // Encrypted private key for server-side order signing
+  // Used with official ClobClient for signature compatibility
+  encryptedPrivateKey String?
 
   // Funder address (proxy wallet where funds are held - for proxy wallets only)
   // If not set, walletAddress is used (for direct EOA wallets)

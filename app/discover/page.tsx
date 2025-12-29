@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Filter, SlidersHorizontal, TrendingUp, Search } from 'lucide-react'
+import { Loader2, Filter, SlidersHorizontal, TrendingUp, Search, Waves, Zap } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CapitalHeader } from '@/components/discover/capital-header'
 import { MarketDrawer } from '@/components/discover/market-drawer'
 import { MarketCard } from '@/components/markets/market-card'
@@ -43,8 +44,30 @@ interface MarketOpportunity {
   recommendedCapital: number
 }
 
+interface StableMarket {
+  id: string
+  question: string
+  rewardPool: number
+  midpoint: number
+  volume24h: number
+  liquidity: number
+  endDate: string
+  clobTokenIds: string[]
+  conditionId: string | null
+  spread: number // Actual spread (0.03 = 3%)
+  stabilityScore: number
+  volumeScore: number
+  spreadScore: number
+  depthScore: number
+  rewardEfficiency: number
+  recommendation: string
+}
+
 export default function DiscoverPage() {
   const { address } = useAccount()
+
+  // Mode: 'active' for normal, 'calm' for stable/low-activity markets
+  const [mode, setMode] = useState<'active' | 'calm'>('active')
 
   // Capital & search state
   const [capital, setCapital] = useState('')
@@ -55,6 +78,8 @@ export default function DiscoverPage() {
   // Markets data
   const [markets, setMarkets] = useState<Market[]>([])
   const [opportunities, setOpportunities] = useState<MarketOpportunity[]>([])
+  const [stableMarkets, setStableMarkets] = useState<StableMarket[]>([])
+  const [loadingStable, setLoadingStable] = useState(false)
 
   // Drawer state
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
@@ -71,7 +96,14 @@ export default function DiscoverPage() {
         const response = await fetch('/api/markets?limit=100&active=true')
         if (response.ok) {
           const data = await response.json()
-          setMarkets(data.markets || [])
+          // Parse clobTokenIds from JSON string to array
+          const parsedMarkets = (data.markets || []).map((m: any) => ({
+            ...m,
+            clobTokenIds: typeof m.clobTokenIds === 'string'
+              ? JSON.parse(m.clobTokenIds)
+              : m.clobTokenIds || []
+          }))
+          setMarkets(parsedMarkets)
         }
       } catch (error) {
         console.error('Error fetching markets:', error)
@@ -79,6 +111,26 @@ export default function DiscoverPage() {
     }
     fetchMarkets()
   }, [])
+
+  // Fetch stable/calm markets when mode changes
+  useEffect(() => {
+    if (mode === 'calm') {
+      const fetchStableMarkets = async () => {
+        setLoadingStable(true)
+        try {
+          const response = await fetch(`/api/markets/stable?limit=30&minReward=${minRewardPool || 10}&minStability=40`)
+          if (response.ok) {
+            const data = await response.json()
+            setStableMarkets(data.markets || [])
+          }
+        } catch (error) {
+          console.error('Error fetching stable markets:', error)
+        }
+        setLoadingStable(false)
+      }
+      fetchStableMarkets()
+    }
+  }, [mode, minRewardPool])
 
   // Search for opportunities
   const handleSearch = useCallback(async () => {
@@ -180,6 +232,32 @@ export default function DiscoverPage() {
     }
   }
 
+  // Get stability score color
+  const getStabilityColor = (score: number) => {
+    if (score >= 70) return 'text-green-600 bg-green-50'
+    if (score >= 50) return 'text-yellow-600 bg-yellow-50'
+    return 'text-orange-600 bg-orange-50'
+  }
+
+  // Convert stable market to regular Market for drawer
+  const stableToMarket = (stable: StableMarket): Market => {
+    const market = markets.find(m => m.id === stable.id)
+    if (market) return market
+
+    return {
+      id: stable.id,
+      question: stable.question,
+      midpoint: stable.midpoint,
+      rewardPool: stable.rewardPool,
+      volume: stable.volume24h,
+      liquidity: stable.liquidity,
+      endDate: stable.endDate,
+      active: true,
+      clobTokenIds: stable.clobTokenIds || [],
+      conditionId: stable.conditionId || undefined,
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -191,6 +269,27 @@ export default function DiscoverPage() {
           <p className="text-muted-foreground">
             Find the best opportunities, optimize your strategy, and place orders - all in one place.
           </p>
+        </div>
+
+        {/* Mode Tabs */}
+        <div className="mb-6">
+          <Tabs value={mode} onValueChange={(v) => setMode(v as 'active' | 'calm')}>
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="active" className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Active Markets
+              </TabsTrigger>
+              <TabsTrigger value="calm" className="flex items-center gap-2">
+                <Waves className="h-4 w-4" />
+                Calm Markets
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {mode === 'calm' && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Low-activity markets where orders are less likely to fill quickly - ideal for earning rewards.
+            </p>
+          )}
         </div>
 
         {/* Capital Header */}
@@ -259,7 +358,106 @@ export default function DiscoverPage() {
         )}
 
         {/* Results */}
-        {loading ? (
+        {mode === 'calm' ? (
+          /* Calm Markets Mode */
+          loadingStable ? (
+            <div className="flex justify-center items-center py-24">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                <p className="text-muted-foreground">Finding calm markets...</p>
+              </div>
+            </div>
+          ) : stableMarkets.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Waves className="h-5 w-5" />
+                  {stableMarkets.length} Calm Markets
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Lower activity = easier to place orders without quick fills
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {stableMarkets.map((stable, index) => (
+                  <Card
+                    key={stable.id}
+                    className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50"
+                    onClick={() => {
+                      const market = stableToMarket(stable)
+                      handleMarketClick(market)
+                    }}
+                  >
+                    <CardContent className="pt-4">
+                      {/* Rank & Stability Score */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="outline" className="font-mono">
+                          #{index + 1}
+                        </Badge>
+                        <Badge className={getStabilityColor(stable.stabilityScore)}>
+                          {stable.stabilityScore}% Calm
+                        </Badge>
+                      </div>
+
+                      {/* Question */}
+                      <h3 className="font-semibold text-sm line-clamp-2 mb-3 min-h-[2.5rem]">
+                        {stable.question}
+                      </h3>
+
+                      {/* Stats - Show actual values */}
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div className="bg-blue-50 rounded-lg p-2 text-center">
+                          <p className="text-sm font-bold text-blue-600">
+                            {formatUSD(stable.rewardPool)}
+                          </p>
+                          <p className="text-xs text-blue-700">/day</p>
+                        </div>
+                        <div className="bg-green-50 rounded-lg p-2 text-center">
+                          <p className="text-sm font-bold text-green-600">
+                            {stable.spread != null && !isNaN(stable.spread)
+                              ? `${(stable.spread * 100).toFixed(1)}%`
+                              : 'N/A'
+                            }
+                          </p>
+                          <p className="text-xs text-green-700">spread</p>
+                        </div>
+                        <div className="bg-purple-50 rounded-lg p-2 text-center">
+                          <p className="text-sm font-bold text-purple-600">
+                            {stable.volume24h != null
+                              ? stable.volume24h >= 1000000
+                                ? `$${(stable.volume24h / 1000000).toFixed(1)}M`
+                                : stable.volume24h >= 1000
+                                  ? `$${(stable.volume24h / 1000).toFixed(0)}k`
+                                  : `$${stable.volume24h.toFixed(0)}`
+                              : 'N/A'
+                            }
+                          </p>
+                          <p className="text-xs text-purple-700">24h vol</p>
+                        </div>
+                      </div>
+
+                      {/* Recommendation */}
+                      <p className="text-xs text-muted-foreground text-center">
+                        {stable.recommendation}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <Waves className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No Calm Markets Found</h3>
+                <p className="text-muted-foreground">
+                  Try lowering the minimum reward filter to find more markets.
+                </p>
+              </CardContent>
+            </Card>
+          )
+        ) : loading ? (
           <div className="flex justify-center items-center py-24">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />

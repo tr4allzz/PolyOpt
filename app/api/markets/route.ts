@@ -41,6 +41,8 @@ export async function GET(request: Request) {
           endDate: true,
           active: true,
           updatedAt: true,
+          clobTokenIds: true,
+          conditionId: true,
         },
       }),
       prisma.market.count({

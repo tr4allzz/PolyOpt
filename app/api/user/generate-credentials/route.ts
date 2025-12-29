@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { createL1AuthHeaders } from '@/lib/polymarket/eip712-auth';
+import { encryptCredentials } from '@/lib/crypto/encryption';
 
 const CLOB_API_URL = process.env.CLOB_API_URL || 'https://clob.polymarket.com';
 
@@ -119,20 +120,26 @@ export async function POST(request: NextRequest) {
     // Lowercase wallet address for consistency with auth middleware
     const normalizedAddress = address.toLowerCase();
 
-    // TODO: Encrypt credentials before storing in production
+    // Encrypt credentials before storing
+    const encrypted = encryptCredentials({
+      apiKey: credentials.apiKey,
+      apiSecret: credentials.secret,
+      apiPassphrase: credentials.passphrase,
+    });
+
     await prisma.user.upsert({
       where: { walletAddress: normalizedAddress },
       create: {
         walletAddress: normalizedAddress,
-        apiKey: credentials.apiKey,
-        apiSecret: credentials.secret,
-        apiPassphrase: credentials.passphrase,
+        apiKey: encrypted.apiKey,
+        apiSecret: encrypted.apiSecret,
+        apiPassphrase: encrypted.apiPassphrase,
         apiCreatedAt: new Date(),
       },
       update: {
-        apiKey: credentials.apiKey,
-        apiSecret: credentials.secret,
-        apiPassphrase: credentials.passphrase,
+        apiKey: encrypted.apiKey,
+        apiSecret: encrypted.apiSecret,
+        apiPassphrase: encrypted.apiPassphrase,
         apiCreatedAt: new Date(),
       },
     });
