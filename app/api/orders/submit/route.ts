@@ -43,21 +43,21 @@ function createL2AuthHeaders(
     message += body;
   }
 
-  console.log('🔐 L2 Auth Debug:');
-  console.log('   walletAddress:', walletAddress);
-  console.log('   apiKey:', apiKey);
-  console.log('   secret (first 10):', secret?.substring(0, 10) + '...');
-  console.log('   passphrase:', passphrase);
-  console.log('   timestamp:', timestamp);
-  console.log('   method:', method);
-  console.log('   path:', path);
+  console.error('🔐 L2 Auth Debug:');
+  console.error('   walletAddress:', walletAddress);
+  console.error('   apiKey:', apiKey);
+  console.error('   secret (first 10):', secret?.substring(0, 10) + '...');
+  console.error('   passphrase:', passphrase);
+  console.error('   timestamp:', timestamp);
+  console.error('   method:', method);
+  console.error('   path:', path);
 
   const base64Secret = Buffer.from(secret, 'base64');
   const hmac = crypto.createHmac('sha256', base64Secret);
   const sig = hmac.update(message).digest('base64');
   const sigUrlSafe = sig.replace(/\+/g, '-').replace(/\//g, '_');
 
-  console.log('   signature:', sigUrlSafe.substring(0, 20) + '...');
+  console.error('   signature:', sigUrlSafe.substring(0, 20) + '...');
 
   return {
     POLY_ADDRESS: walletAddress.toLowerCase(),
@@ -135,10 +135,10 @@ async function getUserCredentials(walletAddress: string) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🚀🚀🚀 ORDER SUBMIT API CALLED 🚀🚀🚀');
+  console.error('🚀🚀🚀 ORDER SUBMIT API CALLED 🚀🚀🚀');
   try {
     const body = await request.json();
-    console.log('📥 Request body received:', JSON.stringify(body, null, 2).substring(0, 500));
+    console.error('📥 Request body received:', JSON.stringify(body, null, 2).substring(0, 500));
     const { order, signature, orderType = 'GTC', walletAddress } = body;
 
     // Validate required fields
@@ -157,14 +157,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's L2 API credentials
-    console.log('🔍 Looking up credentials for wallet:', walletAddress);
+    console.error('🔍 Looking up credentials for wallet:', walletAddress);
     const userCredentials = await getUserCredentials(walletAddress);
-    console.log('👤 Credentials found:', userCredentials ? 'YES' : 'NO');
+    console.error('👤 Credentials found:', userCredentials ? 'YES' : 'NO');
     if (userCredentials) {
-      console.log('   apiKey:', userCredentials.apiKey);
-      console.log('   apiSecret (first 20):', userCredentials.apiSecret?.substring(0, 20) + '...');
-      console.log('   passphrase:', userCredentials.apiPassphrase);
-      console.log('   funderAddress:', userCredentials.funderAddress);
+      console.error('   apiKey:', userCredentials.apiKey);
+      console.error('   apiSecret (first 20):', userCredentials.apiSecret?.substring(0, 20) + '...');
+      console.error('   passphrase:', userCredentials.apiPassphrase);
+      console.error('   funderAddress:', userCredentials.funderAddress);
     }
     if (!userCredentials) {
       return NextResponse.json(
@@ -221,13 +221,13 @@ export async function POST(request: NextRequest) {
     // Create builder headers (attribution)
     const builderHeaders = createBuilderHeaders(method, path, bodyStr);
 
-    console.log('📦 Submitting order with L2 auth + builder attribution');
-    console.log('   Login wallet:', walletAddress.substring(0, 10) + '...');
-    console.log('   Funder/proxy:', funderAddress.substring(0, 10) + '...');
-    console.log('   API Key (owner):', userCredentials.apiKey);
-    console.log('   Order maker:', order.maker);
-    console.log('   Order signer:', order.signer);
-    console.log('   Order payload:', JSON.stringify(signedOrderPayload, null, 2));
+    console.error('📦 Submitting order with L2 auth + builder attribution');
+    console.error('   Login wallet:', walletAddress.substring(0, 10) + '...');
+    console.error('   Funder/proxy:', funderAddress.substring(0, 10) + '...');
+    console.error('   API Key (owner):', userCredentials.apiKey);
+    console.error('   Order maker:', order.maker);
+    console.error('   Order signer:', order.signer);
+    console.error('   Order payload:', JSON.stringify(signedOrderPayload, null, 2));
 
     // Check balance before submitting
     try {
@@ -248,9 +248,9 @@ export async function POST(request: NextRequest) {
         },
       });
       const balanceText = await balanceResponse.text();
-      console.log('💰 Balance response:', balanceResponse.status, balanceText);
+      console.error('💰 Balance response:', balanceResponse.status, balanceText);
     } catch (e: any) {
-      console.log('⚠️ Could not fetch balance:', e.message);
+      console.error('⚠️ Could not fetch balance:', e.message);
     }
 
     // Submit to Polymarket with both sets of headers
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('✅ Order submitted successfully:', data);
+    console.error('✅ Order submitted successfully:', data);
     return NextResponse.json({
       success: true,
       order: data,
