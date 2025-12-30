@@ -133,8 +133,10 @@ async function getUserCredentials(walletAddress: string) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🚀🚀🚀 ORDER SUBMIT API CALLED 🚀🚀🚀');
   try {
     const body = await request.json();
+    console.log('📥 Request body received:', JSON.stringify(body, null, 2).substring(0, 500));
     const { order, signature, orderType = 'GTC', walletAddress } = body;
 
     // Validate required fields
@@ -153,7 +155,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's L2 API credentials
+    console.log('🔍 Looking up credentials for wallet:', walletAddress);
     const userCredentials = await getUserCredentials(walletAddress);
+    console.log('👤 Credentials found:', userCredentials ? 'YES' : 'NO');
+    if (userCredentials) {
+      console.log('   apiKey:', userCredentials.apiKey);
+      console.log('   apiSecret (first 20):', userCredentials.apiSecret?.substring(0, 20) + '...');
+      console.log('   passphrase:', userCredentials.apiPassphrase);
+      console.log('   funderAddress:', userCredentials.funderAddress);
+    }
     if (!userCredentials) {
       return NextResponse.json(
         { error: 'No API credentials found. Please set up your account first.' },
