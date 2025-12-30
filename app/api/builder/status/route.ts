@@ -5,6 +5,7 @@
  * Check if builder credentials are configured (from environment variables)
  * and return the integration status.
  */
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isBuilderConfigured, getBuilderStatus } from '@/lib/polymarket/builder-client';

@@ -1,5 +1,6 @@
 // app/api/user/recommendations/route.ts
 // Generate personalized recommendations to maximize rewards
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';

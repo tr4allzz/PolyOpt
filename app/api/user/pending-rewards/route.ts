@@ -1,5 +1,6 @@
 // app/api/user/pending-rewards/route.ts
 // Calculate pending/accrued rewards that haven't been paid out yet
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';

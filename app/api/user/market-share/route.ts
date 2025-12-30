@@ -1,5 +1,6 @@
 // app/api/user/market-share/route.ts
 // Calculate user's historical market share based on actual payouts vs potential
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';

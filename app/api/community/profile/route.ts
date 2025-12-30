@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server'
 import { API_ENDPOINTS } from '@/lib/constants'
 import { getLeaderboardData } from '@/lib/leaderboard-cache'

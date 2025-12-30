@@ -2,6 +2,7 @@
  * API Route: Get negRisk status for a token
  * GET /api/markets/neg-risk?tokenId=...
  */
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 

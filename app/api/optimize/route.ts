@@ -1,4 +1,5 @@
 // app/api/optimize/route.ts
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';

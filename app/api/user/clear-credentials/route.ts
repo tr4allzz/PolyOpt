@@ -1,5 +1,6 @@
 // app/api/user/clear-credentials/route.ts
 // Clear invalid API credentials so user can re-setup
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';

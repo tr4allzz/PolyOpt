@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchDuneLeaderboard, convertToLeaderboardFormat } from '@/lib/dune-leaderboard'
 import fs from 'fs'

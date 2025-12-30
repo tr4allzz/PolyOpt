@@ -1,5 +1,6 @@
 // app/api/user/scan-positions/route.ts
 // Scan Polymarket for user's positions using authenticated API
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';

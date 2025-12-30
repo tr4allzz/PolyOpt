@@ -1,5 +1,6 @@
 // app/api/user/get-nonce/route.ts
 // Proxy endpoint to get nonce from Polymarket CLOB (avoid CORS)
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';

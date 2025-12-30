@@ -5,6 +5,7 @@
  * Places an order on Polymarket with builder attribution.
  * Requires L2 API credentials and optionally builder credentials.
  */
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { placeOrder, OrderRequest } from '@/lib/polymarket/builder-client';

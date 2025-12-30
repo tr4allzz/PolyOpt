@@ -5,6 +5,7 @@
  * Analyzes markets to find ones that are less volatile and easier to place orders
  * Considers: volume, price stability, trading frequency, spread consistency
  */
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';

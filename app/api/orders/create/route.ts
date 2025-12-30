@@ -5,6 +5,7 @@
  * Uses the official @polymarket/clob-client to create and sign orders
  * This ensures signature compatibility with Polymarket's API
  */
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ClobClient, Side } from '@polymarket/clob-client';

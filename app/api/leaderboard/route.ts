@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server'
 import { getLeaderboardData, getCacheMetadata } from '@/lib/leaderboard-cache'
 import { LeaderboardEntry } from '@/lib/dune-leaderboard'

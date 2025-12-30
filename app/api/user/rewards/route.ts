@@ -1,5 +1,6 @@
 // app/api/user/rewards/route.ts
 // Fetch actual rewards earned from Polymarket Data API
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';

@@ -4,6 +4,7 @@
  *
  * Cancel a single order or all orders for a user.
  */
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cancelOrder, cancelAllOrders } from '@/lib/polymarket/builder-client';

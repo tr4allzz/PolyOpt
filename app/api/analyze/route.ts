@@ -1,5 +1,6 @@
 // app/api/analyze/route.ts
 // API endpoint to analyze best markets for given capital
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
