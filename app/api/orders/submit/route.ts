@@ -7,6 +7,8 @@
  * - Builder attribution headers
  */
 
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { buildHmacSignature, BuilderApiKeyCreds } from '@polymarket/builder-signing-sdk';
 import { prisma } from '@/lib/prisma';

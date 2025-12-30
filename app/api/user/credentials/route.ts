@@ -1,6 +1,8 @@
 // app/api/user/credentials/route.ts
 // Save and manage Polymarket API credentials for authenticated access
 
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';

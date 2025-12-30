@@ -1,6 +1,8 @@
 // app/api/user/auto-setup-api/route.ts
 // Automatically derive and save API credentials from wallet signature
 
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
