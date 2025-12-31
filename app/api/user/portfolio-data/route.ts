@@ -1,25 +1,22 @@
 // app/api/user/portfolio-data/route.ts
 // Combined endpoint for portfolio page data
+// NOTE: Order fetching disabled - we no longer store API credentials
 
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth/middleware';
-import { decryptCredentials } from '@/lib/crypto/encryption';
 import { getAddress } from 'viem';
 
 const DATA_API_URL = 'https://data-api.polymarket.com';
-const CLOB_API_URL = 'https://clob.polymarket.com';
 
 /**
  * GET /api/user/portfolio-data
  * Fetches all portfolio data in one request:
  * - Rewards from Polymarket Data API
  * - Active positions from Polymarket Data API
- * - Open orders (if API credentials exist)
  * - Positions from our database
- * - Credentials status
  */
 export const GET = requireAuth(async (request: NextRequest, auth) => {
   const walletAddress = auth.walletAddress;
@@ -45,18 +42,8 @@ export const GET = requireAuth(async (request: NextRequest, auth) => {
   const rewards = rewardsResult.status === 'fulfilled' ? rewardsResult.value : { rewards: [], summary: { totalEarned: 0, totalRewards: 0 } };
   const activePositions = activePositionsResult.status === 'fulfilled' ? activePositionsResult.value : { positions: [], summary: { totalPositions: 0, totalValue: 0, totalPnl: 0 } };
 
-  // Check if user has API credentials
-  const hasCredentials = !!(dbUser?.apiKey);
-
-  // Fetch open orders if user has credentials
-  let openOrders: { orders: any[]; summary: { totalOrders: number } } = { orders: [], summary: { totalOrders: 0 } };
-  if (hasCredentials && dbUser) {
-    try {
-      openOrders = await fetchOpenOrders(walletAddress, dbUser);
-    } catch (error) {
-      console.error('Error fetching open orders:', error);
-    }
-  }
+  // Open orders disabled - we no longer store credentials
+  const openOrders = { orders: [], summary: { totalOrders: 0 } };
 
   // Get positions from database
   const positions = dbUser?.positions?.length ? {
@@ -75,7 +62,7 @@ export const GET = requireAuth(async (request: NextRequest, auth) => {
     activePositions,
     openOrders,
     positions,
-    hasCredentials,
+    hasCredentials: false, // We no longer store credentials
   });
 });
 
@@ -267,110 +254,5 @@ async function fetchDbUser(walletAddress: string) {
   } catch (error) {
     console.error('Error fetching user from database:', error);
     return null;
-  }
-}
-
-/**
- * Fetch open orders from Polymarket CLOB API
- */
-async function fetchOpenOrders(walletAddress: string, user: any) {
-  try {
-    if (!user.apiKey || !user.apiSecret || !user.apiPassphrase) {
-      return { orders: [], summary: { totalOrders: 0 } };
-    }
-
-    // Decrypt credentials
-    const credentials = decryptCredentials({
-      apiKey: user.apiKey,
-      apiSecret: user.apiSecret,
-      apiPassphrase: user.apiPassphrase,
-    });
-
-    // Build auth headers for CLOB API
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const method = 'GET';
-    const path = '/data/orders';
-
-    // Create signature: HMAC-SHA256(secret, timestamp + method + path)
-    const crypto = await import('crypto');
-    const message = timestamp + method + path;
-    const base64Secret = Buffer.from(credentials.apiSecret, 'base64');
-    const hmac = crypto.createHmac('sha256', base64Secret);
-    hmac.update(message);
-    const signature = hmac.digest('base64');
-
-    // URL-safe base64 encoding (convert '+' to '-' and '/' to '_')
-    const signatureUrlSafe = signature.replace(/\+/g, '-').replace(/\//g, '_');
-
-    const url = `${CLOB_API_URL}${path}`;
-
-    console.log(`Fetching open orders from: ${url}`);
-    console.log(`Using wallet address: ${walletAddress}`);
-
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'POLY_ADDRESS': walletAddress,
-        'POLY_API_KEY': credentials.apiKey,
-        'POLY_SIGNATURE': signatureUrlSafe,
-        'POLY_TIMESTAMP': timestamp,
-        'POLY_PASSPHRASE': credentials.apiPassphrase,
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Failed to fetch orders:', response.status, errorText);
-      return { orders: [], summary: { totalOrders: 0 } };
-    }
-
-    const data = await response.json();
-    console.log('📦 Raw orders response:', JSON.stringify(data).substring(0, 500));
-
-    // API returns { data: [...orders...] } not a direct array
-    const rawOrders = Array.isArray(data) ? data : (data?.data && Array.isArray(data.data) ? data.data : []);
-
-    console.log(`Fetched ${rawOrders.length} open orders`);
-
-    // Fetch market titles for the orders
-    const uniqueMarketIds = Array.from(new Set(rawOrders.map((o: any) => o.market))) as string[];
-    const marketTitles: Record<string, string> = {};
-
-    // Fetch market details from CLOB API (in parallel, max 5 at a time)
-    if (uniqueMarketIds.length > 0) {
-      console.log(`Fetching titles for ${uniqueMarketIds.length} markets...`);
-
-      const marketPromises = uniqueMarketIds.map(async (marketId: string) => {
-        try {
-          const marketRes = await fetch(`https://clob.polymarket.com/markets/${marketId}`, {
-            next: { revalidate: 300 }, // Cache for 5 minutes
-          });
-          if (marketRes.ok) {
-            const marketData = await marketRes.json();
-            marketTitles[marketId] = marketData.question || marketData.title || 'Unknown Market';
-          }
-        } catch (e) {
-          console.warn(`Failed to fetch market ${marketId}`);
-        }
-      });
-
-      await Promise.all(marketPromises);
-    }
-
-    // Enrich orders with market titles
-    const orders = rawOrders.map((order: any) => ({
-      ...order,
-      marketTitle: marketTitles[order.market] || 'Unknown Market',
-    }));
-
-    return {
-      orders,
-      summary: {
-        totalOrders: orders.length,
-      },
-    };
-  } catch (error) {
-    console.error('Error fetching open orders:', error);
-    return { orders: [], summary: { totalOrders: 0 } };
   }
 }
