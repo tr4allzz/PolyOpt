@@ -69,6 +69,16 @@ export function Footer() {
               </li>
             </ul>
           </div>
+          <div>
+            <h4 className="font-semibold mb-2">Legal</h4>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li>
+                <a href="/terms" className="hover:text-foreground">
+                  Terms of Service
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
         <div className="mt-8 pt-4 border-t text-center text-sm text-muted-foreground">
           © {new Date().getFullYear()} opt.markets. All rights reserved.
