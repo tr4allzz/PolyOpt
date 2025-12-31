@@ -5,6 +5,7 @@ import { WagmiProvider } from 'wagmi'
 import { config } from '@/lib/wagmi'
 import { ReactNode, useState } from 'react'
 import { Toaster } from '@/components/ui/sonner'
+import { WrappedProvider } from '@/components/wrapped/wrapped-provider'
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -22,7 +23,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <WrappedProvider>
+          {children}
+        </WrappedProvider>
         <Toaster position="bottom-right" />
       </QueryClientProvider>
     </WagmiProvider>
