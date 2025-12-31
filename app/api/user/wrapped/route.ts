@@ -50,40 +50,60 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user's funder/proxy address if they have one
+    // Get user's funder/proxy address if they have one (for app users)
     const user = await prisma.user.findUnique({
       where: { walletAddress: walletAddress.toLowerCase() },
       select: { funderAddress: true },
     });
 
-    // Use funderAddress (proxy wallet) if available, otherwise use login wallet
-    const rewardsWallet = user?.funderAddress || walletAddress.toLowerCase();
-
     console.log(`🎁 Generating wrapped stats for ${walletAddress} (${year})...`);
-    console.log(`💰 Fetching rewards for wallet: ${rewardsWallet}`);
 
-    // Fetch all rewards from Polymarket Data API
-    const url = new URL(`${DATA_API_URL}/activity`);
-    url.searchParams.append('user', rewardsWallet);
-    url.searchParams.append('type', 'REWARD');
-    url.searchParams.append('limit', '1000');
-    url.searchParams.append('sortBy', 'TIMESTAMP');
-    url.searchParams.append('sortDirection', 'DESC');
+    // Helper function to fetch rewards for a wallet
+    const fetchRewards = async (wallet: string) => {
+      const url = new URL(`${DATA_API_URL}/activity`);
+      url.searchParams.append('user', wallet);
+      url.searchParams.append('type', 'REWARD');
+      url.searchParams.append('limit', '1000');
+      url.searchParams.append('sortBy', 'TIMESTAMP');
+      url.searchParams.append('sortDirection', 'DESC');
 
-    console.log(`📡 Fetching rewards from: ${url.toString()}`);
-    const response = await fetch(url.toString());
+      console.log(`📡 Fetching rewards from: ${url.toString()}`);
+      const response = await fetch(url.toString());
 
-    if (!response.ok) {
-      console.error(`Data API error: ${response.status}`);
-      const errorText = await response.text();
-      console.error(`Error body: ${errorText}`);
-      return NextResponse.json(
-        { error: 'Failed to fetch rewards data' },
-        { status: response.status }
-      );
+      if (!response.ok) {
+        console.error(`Data API error for ${wallet}: ${response.status}`);
+        return [];
+      }
+
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    };
+
+    // Try fetching rewards - first from the wallet directly, then from funderAddress if different
+    let rewards: any[] = [];
+    const walletsToTry = [walletAddress.toLowerCase()];
+
+    // If user has a funderAddress (proxy wallet), also try that
+    if (user?.funderAddress && user.funderAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+      walletsToTry.push(user.funderAddress.toLowerCase());
     }
 
-    const rewards = await response.json();
+    // Fetch from all wallets and combine
+    for (const wallet of walletsToTry) {
+      console.log(`💰 Trying wallet: ${wallet}`);
+      const walletRewards = await fetchRewards(wallet);
+      console.log(`📦 Found ${walletRewards.length} rewards for ${wallet}`);
+      rewards = rewards.concat(walletRewards);
+    }
+
+    // Remove duplicates based on transaction hash if present
+    const seen = new Set();
+    rewards = rewards.filter((r: any) => {
+      const key = r.transactionHash || `${r.timestamp}-${r.usdcSize}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     console.log(`📊 Raw rewards response (first 2):`, JSON.stringify(rewards?.slice?.(0, 2) || rewards, null, 2));
 
     // Filter rewards for the specified year
@@ -144,11 +164,10 @@ export async function GET(request: NextRequest) {
     }
     maxStreak = Math.max(maxStreak, currentStreak);
 
-    // Get rank from leaderboard (check both login wallet and proxy wallet)
+    // Get rank from leaderboard (check all wallets we tried)
     const leaderboard = getLeaderboardData();
     const userEntry = leaderboard.find(
-      (e) => e.walletAddress.toLowerCase() === walletAddress.toLowerCase() ||
-             e.walletAddress.toLowerCase() === rewardsWallet.toLowerCase()
+      (e) => walletsToTry.includes(e.walletAddress.toLowerCase())
     );
     const rank = userEntry?.rank || null;
     const totalLPs = leaderboard.length;
