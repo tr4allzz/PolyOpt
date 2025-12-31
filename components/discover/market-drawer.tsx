@@ -579,49 +579,29 @@ export function MarketDrawer({
           {/* Action Buttons */}
           {orders.length > 0 && (
             <div className="space-y-2">
-              <Button
-                onClick={handlePlaceOrders}
-                disabled={placing || !hasCredentials || loadingFunder}
-                className="w-full"
-                size="lg"
-              >
-                {placing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Placing Orders...
-                  </>
-                ) : loadingFunder ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : !hasCredentials ? (
-                  'Setup Required'
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Sign & Place {orders.length} Orders
-                  </>
-                )}
-              </Button>
+              {/* Order placement disabled notice */}
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <span className="text-sm font-medium text-yellow-900">Direct order placement is temporarily disabled</span>
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <Button
                   onClick={handleOpenPolymarket}
-                  variant="outline"
                   className="flex-1"
-                  size="sm"
+                  size="lg"
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  View Market
+                  Place on Polymarket
                 </Button>
                 <Button
                   onClick={handleCopyOrders}
                   variant="outline"
-                  className="flex-1"
-                  size="sm"
+                  size="lg"
                 >
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Details
+                  <Copy className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -637,12 +617,12 @@ export function MarketDrawer({
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <Lightbulb className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-900">How it works</span>
+              <span className="text-sm font-medium text-blue-900">How to use</span>
             </div>
             <ul className="text-xs text-blue-800 space-y-1">
               <li>1. Select your capital and strategy</li>
-              <li>2. Review the calculated orders</li>
-              <li>3. Click button and sign in MetaMask</li>
+              <li>2. Review the calculated order prices</li>
+              <li>3. Copy details and place on Polymarket</li>
             </ul>
           </div>
         </div>

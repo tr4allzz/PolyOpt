@@ -10,6 +10,8 @@ datasource db {
 }
 
 // User (Wallet-based)
+// NOTE: We only store public data - no private keys or API credentials
+// All sensitive operations happen client-side or on Polymarket directly
 model User {
   id            String   @id @default(cuid())
   walletAddress String   @unique
@@ -20,27 +22,9 @@ model User {
   tier          Tier     @default(FREE)
   stripeId      String?  @unique
 
-  // Polymarket API Credentials (L2 Authentication)
-  // All credentials are encrypted
-  apiKey        String?
-  apiSecret     String?
-  apiPassphrase String?
-  apiCreatedAt  DateTime?
-
-  // Encrypted private key for server-side order signing
-  // Used with official ClobClient for signature compatibility
-  encryptedPrivateKey String?
-
   // Funder address (proxy wallet where funds are held - for proxy wallets only)
-  // If not set, walletAddress is used (for direct EOA wallets)
+  // This is a PUBLIC address, not sensitive - just used to look up rewards
   funderAddress String?
-
-  // Builder Program Credentials (for order attribution)
-  // Get these from your Polymarket Builder Profile
-  builderApiKey        String?
-  builderApiSecret     String?
-  builderApiPassphrase String?
-  builderCreatedAt     DateTime?
 
   // Relations
   positions     Position[]
