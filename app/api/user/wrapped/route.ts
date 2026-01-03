@@ -6,8 +6,44 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getLeaderboardData } from '@/lib/leaderboard-cache';
 import { prisma } from '@/lib/prisma';
+import { getAddress } from 'viem';
 
 const DATA_API_URL = 'https://data-api.polymarket.com';
+
+/**
+ * Lookup proxy wallet (Safe) from EOA using Safe Global API
+ * Polymarket uses Gnosis Safe for proxy wallets on Polygon
+ */
+async function lookupProxyWallet(eoaAddress: string): Promise<string | null> {
+  try {
+    // Safe API requires EIP-55 checksum address - use viem's getAddress
+    const checksumAddr = getAddress(eoaAddress);
+    const url = `https://safe-transaction-polygon.safe.global/api/v1/owners/${checksumAddr}/safes/`;
+    console.log(`🔍 Looking up proxy wallet for EOA: ${checksumAddr}`);
+
+    const response = await fetch(url, {
+      next: { revalidate: 300 }, // Cache for 5 minutes
+    });
+
+    if (!response.ok) {
+      console.log(`Safe API returned ${response.status} - user may not have a proxy wallet`);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.safes && data.safes.length > 0) {
+      // Return the first safe (usually the Polymarket proxy wallet)
+      console.log(`✅ Found proxy wallet via Safe API: ${data.safes[0]}`);
+      return data.safes[0];
+    }
+
+    console.log('No proxy wallet found for this EOA');
+    return null;
+  } catch (error) {
+    console.error('Error looking up proxy wallet:', error);
+    return null;
+  }
+}
 
 interface WrappedStats {
   year: number;
@@ -86,6 +122,15 @@ export async function GET(request: NextRequest) {
     // If user has a funderAddress (proxy wallet), also try that
     if (user?.funderAddress && user.funderAddress.toLowerCase() !== walletAddress.toLowerCase()) {
       walletsToTry.push(user.funderAddress.toLowerCase());
+    }
+
+    // Auto-discover proxy wallet via Safe Global API if not already known
+    if (!user?.funderAddress) {
+      const discoveredProxy = await lookupProxyWallet(walletAddress);
+      if (discoveredProxy && discoveredProxy.toLowerCase() !== walletAddress.toLowerCase()) {
+        console.log(`🔍 Auto-discovered proxy wallet: ${discoveredProxy}`);
+        walletsToTry.push(discoveredProxy.toLowerCase());
+      }
     }
 
     // Fetch from all wallets and combine
