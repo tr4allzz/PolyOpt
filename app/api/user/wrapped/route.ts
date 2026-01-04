@@ -45,6 +45,12 @@ async function lookupProxyWallet(eoaAddress: string): Promise<string | null> {
   }
 }
 
+interface RecentReward {
+  date: string;
+  amount: number;
+  timestamp: number;
+}
+
 interface WrappedStats {
   year: number;
   totalEarned: number;
@@ -60,6 +66,7 @@ interface WrappedStats {
   streakDays: number;
   avgPerDay: number;
   avgPerReward: number;
+  recentRewards: RecentReward[];
 }
 
 /**
@@ -149,6 +156,10 @@ export async function GET(request: NextRequest) {
       seen.add(key);
       return true;
     });
+
+    // Sort all rewards by timestamp DESC (newest first) after combining from multiple wallets
+    rewards.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
+
     console.log(`📊 Raw rewards response (first 2):`, JSON.stringify(rewards?.slice?.(0, 2) || rewards, null, 2));
 
     // Filter rewards for the specified year
@@ -224,6 +235,14 @@ export async function GET(request: NextRequest) {
       ? Math.round((totalEarned / activeDays) * 100) / 100
       : 0;
 
+    // Get the 5 most recent rewards from ALL rewards (not just current year)
+    // This shows the user's newest earnings regardless of year filter
+    const recentRewards: RecentReward[] = rewards.slice(0, 5).map((r: any) => ({
+      date: new Date(r.timestamp * 1000).toISOString().split('T')[0],
+      amount: Math.round(parseFloat(r.usdcSize || r.size || 0) * 100) / 100,
+      timestamp: r.timestamp,
+    }));
+
     const stats: WrappedStats = {
       year,
       totalEarned: Math.round(totalEarned * 100) / 100,
@@ -241,6 +260,7 @@ export async function GET(request: NextRequest) {
       avgPerReward: yearRewards.length > 0
         ? Math.round((totalEarned / yearRewards.length) * 100) / 100
         : 0,
+      recentRewards,
     };
 
     console.log(`✅ Wrapped stats generated: $${stats.totalEarned} earned, rank #${rank || 'N/A'}`);

@@ -6,7 +6,7 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Trophy, TrendingUp, Calendar, Flame, DollarSign, Sparkles, ChevronLeft, ChevronRight, Share2, Star } from 'lucide-react';
+import { Trophy, TrendingUp, Calendar, Flame, DollarSign, Sparkles, ChevronLeft, ChevronRight, Star, Gift, Twitter } from 'lucide-react';
 
 // Snowflake component
 function Snowflake({ style }: { style: React.CSSProperties }) {
@@ -46,6 +46,12 @@ function AnimatedNumber({ value, prefix = '', suffix = '' }: { value: number; pr
   return <>{prefix}{displayValue.toLocaleString()}{suffix}</>;
 }
 
+interface RecentReward {
+  date: string;
+  amount: number;
+  timestamp: number;
+}
+
 interface WrappedStats {
   year: number;
   totalEarned: number;
@@ -61,6 +67,7 @@ interface WrappedStats {
   streakDays: number;
   avgPerDay: number;
   avgPerReward: number;
+  recentRewards: RecentReward[];
 }
 
 interface LPWrappedProps {
@@ -189,6 +196,16 @@ export function LPWrapped({ walletAddress, open, onOpenChange }: LPWrappedProps)
       bg: 'from-teal-950 via-cyan-900 to-sky-950',
       glow: 'shadow-teal-500/20',
     },
+    // Slide 7: Recent Rewards
+    {
+      icon: <Gift className="h-8 w-8" />,
+      iconBg: 'bg-pink-500/20',
+      iconColor: 'text-pink-400',
+      title: 'Latest Rewards',
+      isRecentRewards: true,
+      bg: 'from-pink-950 via-rose-900 to-red-950',
+      glow: 'shadow-pink-500/20',
+    },
   ] : [];
 
   const nextSlide = () => {
@@ -210,18 +227,25 @@ export function LPWrapped({ walletAddress, open, onOpenChange }: LPWrappedProps)
     setCurrentSlide(index);
   };
 
-  const handleShare = async () => {
-    const text = `My Polymarket Rewards Wrapped 2025:\n💰 $${stats?.totalEarned.toLocaleString()} earned\n🏆 Rank #${stats?.rank || 'Unranked'}\n🔥 ${stats?.streakDays} day streak\n\nCheck yours at opt.markets`;
+  const shareToTwitter = () => {
+    const text = `🎁 My Polymarket Rewards Wrapped 2025
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ text });
-      } catch (err) {
-        // User cancelled or error
-      }
-    } else {
-      navigator.clipboard.writeText(text);
-    }
+💰 $${stats?.totalEarned.toLocaleString()} earned
+🏆 Rank #${stats?.rank || 'Unranked'}
+🔥 ${stats?.streakDays} day streak
+📅 ${stats?.activeDays} active days
+
+Check yours at opt.markets 👀
+
+@Polymarket @optmarkets`;
+
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'width=550,height=420');
+  };
+
+  const copyToClipboard = async () => {
+    const text = `My Polymarket Rewards Wrapped 2025:\n💰 $${stats?.totalEarned.toLocaleString()} earned\n🏆 Rank #${stats?.rank || 'Unranked'}\n🔥 ${stats?.streakDays} day streak\n\nCheck yours at opt.markets`;
+    await navigator.clipboard.writeText(text);
   };
 
   return (
@@ -285,6 +309,15 @@ export function LPWrapped({ walletAddress, open, onOpenChange }: LPWrappedProps)
 
             {stats && !loading && stats.totalEarned > 0 && (
               <>
+                {/* Floating Twitter Share Button - Always visible like Spotify */}
+                <button
+                  onClick={shareToTwitter}
+                  className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-black/40 hover:bg-black/60 border border-white/20 text-white/90 hover:text-white transition-all text-sm font-medium backdrop-blur-sm"
+                >
+                  <Twitter className="h-4 w-4" />
+                  <span className="hidden sm:inline">Share</span>
+                </button>
+
                 {/* Stats Card */}
                 <div
                   key={currentSlide}
@@ -300,15 +333,36 @@ export function LPWrapped({ walletAddress, open, onOpenChange }: LPWrappedProps)
                     {slides[currentSlide]?.title}
                   </p>
 
-                  {/* Value */}
-                  <p className="text-5xl font-bold text-white mb-3 tracking-tight">
-                    {slides[currentSlide]?.value}
-                  </p>
+                  {/* Conditional rendering for recent rewards slide */}
+                  {slides[currentSlide]?.isRecentRewards ? (
+                    <div className="space-y-2">
+                      {stats.recentRewards && stats.recentRewards.length > 0 ? (
+                        stats.recentRewards.map((reward, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-white/5 border border-white/10"
+                          >
+                            <span className="text-white/70 text-sm">{formatDate(reward.date)}</span>
+                            <span className="text-white font-semibold">${reward.amount.toLocaleString()}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-white/50 text-sm">No recent rewards</p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Value */}
+                      <p className="text-5xl font-bold text-white mb-3 tracking-tight">
+                        {slides[currentSlide]?.value}
+                      </p>
 
-                  {/* Subtitle */}
-                  <p className="text-white/50 text-sm">
-                    {slides[currentSlide]?.subtitle}
-                  </p>
+                      {/* Subtitle */}
+                      <p className="text-white/50 text-sm">
+                        {slides[currentSlide]?.subtitle}
+                      </p>
+                    </>
+                  )}
 
                   {/* Special badge for top ranks */}
                   {slides[currentSlide]?.special && (
@@ -347,18 +401,6 @@ export function LPWrapped({ walletAddress, open, onOpenChange }: LPWrappedProps)
                   </Button>
 
                   <div className="flex gap-2">
-                    {currentSlide === slides.length - 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleShare}
-                        className="text-white/70 hover:text-white hover:bg-white/10"
-                      >
-                        <Share2 className="h-4 w-4 mr-2" />
-                        Share
-                      </Button>
-                    )}
-
                     {currentSlide === slides.length - 1 ? (
                       <Button
                         onClick={() => onOpenChange(false)}
