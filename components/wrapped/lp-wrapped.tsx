@@ -6,7 +6,16 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Trophy, TrendingUp, Calendar, Flame, DollarSign, Sparkles, ChevronLeft, ChevronRight, Star, Gift, Twitter } from 'lucide-react';
+import { Trophy, TrendingUp, Calendar, Flame, DollarSign, Sparkles, ChevronLeft, ChevronRight, Star, Gift } from 'lucide-react';
+
+// X (Twitter) logo component
+function XLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
 
 // Snowflake component
 function Snowflake({ style }: { style: React.CSSProperties }) {
@@ -309,12 +318,12 @@ Check yours at opt.markets 👀
 
             {stats && !loading && stats.totalEarned > 0 && (
               <>
-                {/* Floating Twitter Share Button - Always visible like Spotify */}
+                {/* Floating X Share Button - Always visible like Spotify */}
                 <button
                   onClick={shareToTwitter}
-                  className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-black/40 hover:bg-black/60 border border-white/20 text-white/90 hover:text-white transition-all text-sm font-medium backdrop-blur-sm"
+                  className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-black/40 hover:bg-black/60 border border-white/20 text-white/90 hover:text-white transition-all text-sm font-medium backdrop-blur-sm"
                 >
-                  <Twitter className="h-4 w-4" />
+                  <XLogo className="h-4 w-4" />
                   <span className="hidden sm:inline">Share</span>
                 </button>
 
