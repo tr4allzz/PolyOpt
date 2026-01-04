@@ -21,15 +21,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tr4allzz/PolyOpt.git"
+    "url": "git+https://github.com/tr4allzz/opt.markets.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/tr4allzz/PolyOpt/issues"
+    "url": "https://github.com/tr4allzz/opt.markets/issues"
   },
-  "homepage": "https://github.com/tr4allzz/PolyOpt#readme",
+  "homepage": "https://github.com/tr4allzz/opt.markets#readme",
   "dependencies": {
     "@polymarket/builder-signing-sdk": "^0.0.8",
     "@polymarket/clob-client": "^4.22.8",

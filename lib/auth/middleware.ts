@@ -18,7 +18,7 @@ export interface AuthContext {
  * Must match exactly what the client signs
  */
 export function generateAuthMessage(walletAddress: string, timestamp: number): string {
-  return `PolyOpt Authentication
+  return `opt.markets Authentication
 
 Wallet: ${walletAddress}
 Timestamp: ${timestamp}

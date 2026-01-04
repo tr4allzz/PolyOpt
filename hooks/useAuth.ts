@@ -89,7 +89,7 @@ export function useAuth() {
    * Generate authentication message for signing
    */
   const generateAuthMessage = useCallback((walletAddress: string, timestamp: number): string => {
-    return `PolyOpt Authentication
+    return `opt.markets Authentication
 
 Wallet: ${walletAddress}
 Timestamp: ${timestamp}

@@ -1,4 +1,4 @@
-# PolyOpt - Polymarket Liquidity Rewards Optimizer
+# opt.markets - Polymarket Liquidity Rewards Optimizer
 
 A web application that helps Polymarket liquidity providers optimize their rewards by calculating exact Q-scores, tracking competition, and optimizing order placement.
 
@@ -33,8 +33,8 @@ A web application that helps Polymarket liquidity providers optimize their rewar
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/tr4allzz/PolyOpt.git
-cd PolyOpt
+git clone https://github.com/tr4allzz/opt.markets.git
+cd opt.markets
 ```
 
 2. Install dependencies:
@@ -102,7 +102,7 @@ polyopt/
 
 ## Core Calculation Engine
 
-The heart of PolyOpt is the Q-score calculator that implements Polymarket's reward formula:
+The heart of opt.markets is the Q-score calculator that implements Polymarket's reward formula:
 
 ### Equations Implemented
 
@@ -228,7 +228,7 @@ MIT License - see LICENSE file for details
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/tr4allzz/PolyOpt/issues
+- GitHub Issues: https://github.com/tr4allzz/opt.markets/issues
 - Polymarket Docs: https://docs.polymarket.com
 
 ---

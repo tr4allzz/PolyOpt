@@ -50,7 +50,7 @@ export default function PortfolioPage() {
 
       // Step 1: Authenticate with our API
       const authTimestamp = Date.now()
-      const authMessage = `PolyOpt Authentication\n\nWallet: ${address}\nTimestamp: ${authTimestamp}\n\nThis signature proves you own this wallet and authorizes access to your data.`
+      const authMessage = `opt.markets Authentication\n\nWallet: ${address}\nTimestamp: ${authTimestamp}\n\nThis signature proves you own this wallet and authorizes access to your data.`
 
       const authSignature = await signMessageAsync({
         message: authMessage,
