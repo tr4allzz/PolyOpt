@@ -30,6 +30,7 @@ model User {
   positions     Position[]
   payouts       Payout[]
   alerts        Alert[]
+  goals         Goal[]
 
   @@index([walletAddress])
   @@index([tier])
@@ -296,6 +297,56 @@ enum RecommendationStatus {
   REJECTED        // User rejected
   EXPIRED         // Recommendation expired
   FAILED          // Execution failed
+}
+
+// User Goals & Milestones
+model Goal {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Goal Details
+  type          GoalType
+  targetAmount  Float    // Target $ amount
+  currentAmount Float    @default(0) // Current progress (cached)
+
+  // Time Period
+  period        GoalPeriod
+  startDate     DateTime @default(now())
+  endDate       DateTime
+
+  // Status
+  status        GoalStatus @default(ACTIVE)
+  completedAt   DateTime?
+  celebratedAt  DateTime?  // When user saw the celebration
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, endDate])
+  @@index([status, endDate])
+}
+
+enum GoalType {
+  EARNINGS     // Total earnings target
+  STREAK       // Consecutive days target
+  RANK         // Reach a certain rank
+}
+
+enum GoalPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CUSTOM
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  FAILED       // Didn't reach goal by end date
+  CANCELLED
 }
 
 // Bot Execution Log

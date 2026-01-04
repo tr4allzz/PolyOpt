@@ -14,6 +14,7 @@ import { formatUSD } from '@/lib/polymarket/utils'
 import { Loader2, TrendingUp, DollarSign, Wallet, ExternalLink, RefreshCw, AlertCircle, LayoutDashboard, ListOrdered, PieChart, ArrowRight, Calendar } from 'lucide-react'
 import { RewardsCalendar } from '@/components/portfolio/rewards-calendar'
 import { StreakTracker } from '@/components/portfolio/streak-tracker'
+import { GoalsSection } from '@/components/goals'
 import { ConnectButton } from '@/components/wallet/connect-button'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -445,6 +446,9 @@ export default function PortfolioPage() {
 
             {/* Rewards Tab */}
             <TabsContent value="rewards" className="space-y-6">
+              {/* Goals Section */}
+              {address && <GoalsSection walletAddress={address} />}
+
               {/* Calendar & Streak Section */}
               <div className="grid gap-4 lg:grid-cols-2">
                 <RewardsCalendar rewards={rewards?.rewards || []} days={30} />
